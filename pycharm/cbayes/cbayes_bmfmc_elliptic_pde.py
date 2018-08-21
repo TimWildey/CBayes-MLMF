@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde as GKDE
+from scipy.stats import gaussian_kde as gkde
 from scipy.stats import norm
 import bmfmc_elliptic_pde
 import cbayes_utils as utils
@@ -25,7 +25,7 @@ post_lam = lam[samples_to_keep, :]
 accept_rate = samples_to_keep.size / lam.shape[0]
 
 # Use KDE to estimate the push-forward of the CBayes posterior
-postq_kde = GKDE(post_q)
+postq_kde = gkde(post_q)
 
 # Compare the observed and the push-forwards of prior and posterior
 qplot = np.linspace(0.6, 0.9, num=100)

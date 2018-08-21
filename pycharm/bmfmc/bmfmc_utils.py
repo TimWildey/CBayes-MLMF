@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde as gkde
 import numpy as np
 
 
@@ -85,17 +86,20 @@ def plot_1d_conf(x_pred, y_pred, sigma, num=1, title=''):
     plt.gcf().set_figwidth(6)
 
 
-def plot_2d_scatter(x, y, z, marker='o', num=1, title='', xlim=[], ylim=[], xlabel="$x$", ylabel="$y$"):
+def plot_2d_scatter(samples_x, samples_y, marker='o', num=1, title='', xlim=[], ylim=[], xlabel="$x$", ylabel="$y$"):
 
     if len(str(num)) >= 3:
         plt.subplot(num)
     else:
         plt.figure(num)
 
-    if len(z) == 0:
-        plt.scatter(x, y, s=50, edgecolor='', marker=marker)
-    else:
-        plt.scatter(x, y, c=z, s=50, edgecolor='', marker=marker)
+    x = samples_x
+    y = samples_y
+    xy = np.vstack([x, y])
+    z = gkde(xy)(xy)
+    idx = z.argsort()
+    x, y, z = x[idx], y[idx], z[idx]
+    plt.scatter(x, y, c=z, s=50, edgecolor='', marker=marker)
 
     if len(xlim) == 0:
         xlim = [np.min(x), np.max(x)]
@@ -105,6 +109,32 @@ def plot_2d_scatter(x, y, z, marker='o', num=1, title='', xlim=[], ylim=[], xlab
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.grid()
+    plt.xlim(xlim)
+    plt.ylim(ylim)
+    plt.title(title)
+    plt.gcf().set_figheight(6)
+    plt.gcf().set_figwidth(6)
+
+
+def plot_2d_contour(samples_x, samples_y, num=1, title='', xlim=[], ylim=[], xlabel="$x$", ylabel="$y$"):
+
+    if len(str(num)) >= 3:
+        plt.subplot(num)
+    else:
+        plt.figure(num)
+
+    xy_kde = gkde(np.vstack([samples_x, samples_y]))
+    xx, yy = np.meshgrid(np.linspace(xlim[0], xlim[1], 80), np.linspace(ylim[0], ylim[1], 80))
+    zz = np.reshape(xy_kde(np.vstack([xx.ravel(), yy.ravel()])).T, xx.shape)
+    ax = plt.gca()
+    cfset = ax.contourf(xx, yy, zz, cmap='Blues', alpha=1.0)
+    cset = ax.contour(xx, yy, zz, colors='k', alpha=1.0, linewidths=0.5)
+    ax.clabel(cset, fontsize=4)
+    ax.set_xlabel('$q$')
+    ax.set_ylabel('$Q$')
+    plt.colorbar(cfset)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     plt.xlim(xlim)
     plt.ylim(ylim)
     plt.title(title)

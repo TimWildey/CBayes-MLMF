@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import norm  # The standard Normal distribution
-from scipy.stats import gaussian_kde as GKDE  # A standard kernel density estimator
+from scipy.stats import gaussian_kde as gkde  # A standard kernel density estimator
 import matplotlib.pyplot as plt
 import bmfmc_lambda_p
 import cbayes_utils as utils
@@ -32,8 +32,8 @@ sbayes_post_q = qvals[sbayes_samples_to_keep]
 sbayes_post_lam = lam[sbayes_samples_to_keep]
 
 # Use KDE to estimate the push-forward of the CBayes and SBayes posterior
-postq_kde = GKDE(post_q)
-sb_postq_kde = GKDE(sbayes_post_q)
+postq_kde = gkde(post_q)
+sb_postq_kde = gkde(sbayes_post_q)
 
 # Compare the observed and the push-forwards of prior, CBayes posterior and SBayes posterior
 plt.figure()

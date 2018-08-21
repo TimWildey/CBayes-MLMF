@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.stats import gaussian_kde as GKDE
+from scipy.stats import gaussian_kde as gkde
 import scipy.stats as sstats
 import matplotlib.pyplot as plt
 from sklearn import gaussian_process
@@ -27,7 +27,7 @@ def create_bmfmc_density(n_lf, n_hf, p_lf, p_hf):
 
     # Evaluate the low-fidelity model i.e. generate samples and apply KDE to get p(q)
     samples_lf = lambda_p(lam_lf, p_lf)
-    q_lf = GKDE(samples_lf)
+    q_lf = gkde(samples_lf)
 
     # Plot the low-fidelity density p(q)
     utils.plot_1d_hist(samples_lf, 1)
@@ -90,31 +90,19 @@ def create_bmfmc_density(n_lf, n_hf, p_lf, p_hf):
     plt.gcf().savefig('../pngout/lambda_p_bmfmc_fig4.png', dpi=300)
 
     # Visualize the approximate joint density p(q,Q)
-    x = samples_lf
-    y = samples_hf
-    xy = np.vstack([x, y])
-    z = GKDE(xy)(xy)
-    idx = z.argsort()
-    x, y, z = x[idx], y[idx], z[idx]
-    utils.plot_2d_scatter(x, y, z, num=5, title='Approximate joint $p(q,Q)$', xlabel="$q$", ylabel="$Q$")
+    utils.plot_2d_scatter(samples_x=samples_lf, samples_y=samples_hf, num=5, title='Approximate joint $p(q,Q)$', xlabel="$q$", ylabel="$Q$")
     plt.gcf().savefig('../pngout/lambda_p_bmfmc_fig5.png', dpi=300)
 
     # Visualize the the exact MC joint density p(q,Q)
     samples_hf_mc = lambda_p(lam_lf, p_hf)
-    x = samples_lf
-    y = samples_hf_mc
-    xy = np.vstack([x, y])
-    z = GKDE(xy)(xy)
-    idx = z.argsort()
-    x, y, z = x[idx], y[idx], z[idx]
-    utils.plot_2d_scatter(x, y, z, num=6, title='MC joint $p(q,Q)$', xlabel="$q$", ylabel="$Q$")
+    utils.plot_2d_scatter(samples_x=samples_lf, samples_y=samples_hf_mc, num=6, title='MC joint $p(q,Q)$', xlabel="$q$", ylabel="$Q$")
     plt.gcf().savefig('../pngout/lambda_p_bmfmc_fig6.png', dpi=300)
 
     # Estimate p(Q) using KDE
-    q_hf = GKDE(samples_hf)
+    q_hf = gkde(samples_hf)
 
     # Plot the densities
-    q_hf_mc = GKDE(samples_hf_mc)
+    q_hf_mc = gkde(samples_hf_mc)
     utils.plot_1d_kde(q_hf, -1.0, 1.0, linestyle='-', color='C3', num=7, label='Approximate $p(Q)$')
     utils.plot_1d_kde(q_hf_mc, -1.0, 1.0, linestyle='--', color='C0', num=7, label='MC reference $p(Q)$')
     utils.plot_1d_kde(q_lf, -1.0, 1.0, linestyle='--', color='k', xlabel='$q$ / $Q$', ylabel='$p(q)$ / $p(Q)$',

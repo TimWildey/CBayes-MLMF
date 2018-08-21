@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.stats import gaussian_kde as GKDE
+from scipy.stats import gaussian_kde as gkde
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 from sklearn import gaussian_process
@@ -41,7 +41,7 @@ def create_bmfmc_density(n_hf, fun=lambda x: x):
     # Sample from the low-fidelity and do KDE to get p(q)
     samples_lf, indices = elliptic_pde.get_lowfi_samples(lf, lam, n_lf, fun)
     lam_lf = lam[indices]
-    q_lf = GKDE(samples_lf)
+    q_lf = gkde(samples_lf)
 
     # Plot the low-fidelity density p(q)
     utils.plot_1d_hist(samples_lf, num=1)
@@ -109,38 +109,36 @@ def create_bmfmc_density(n_hf, fun=lambda x: x):
     plt.gcf().savefig('../pngout/elliptic_pde_bmfmc_fig4.png', dpi=300)
 
     # Visualize the approximate joint density p(q,Q)
-    x = samples_lf
-    y = samples_hf
-    xy = np.vstack([x, y])
-    z = GKDE(xy)(xy)
-    idx = z.argsort()
-    x, y, z = x[idx], y[idx], z[idx]
-    utils.plot_2d_scatter(x, y, z, num=5, xlim=[x_min, x_max], ylim=[y_min, y_max],
-                          title = 'Approximate joint $p(q,Q)$', xlabel="$q$", ylabel="$Q$")
+    utils.plot_2d_scatter(samples_x=samples_lf, samples_y=samples_hf, num=5, xlim=[x_min, x_max],
+                          ylim=[y_min, y_max], title='Approximate joint $p(q,Q)$', xlabel="$q$", ylabel="$Q$")
     plt.gcf().savefig('../pngout/elliptic_pde_bmfmc_fig5.png', dpi=300)
 
-    # Visualize the the exact MC joint density p(q,Q)
-    samples_hf_mc = qvals[indices]
-    x = samples_lf
-    y = samples_hf_mc
-    xy = np.vstack([x, y])
-    z = GKDE(xy)(xy)
-    idx = z.argsort()
-    x, y, z = x[idx], y[idx], z[idx]
-    utils.plot_2d_scatter(x, y, z, num=6, xlim=[x_min, x_max], ylim=[y_min, y_max], title='MC joint $p(q,Q)$',
-                          xlabel="$q$", ylabel="$Q$")
+    # Visualize the approximate joint density p(q,Q) in a contour plot
+    utils.plot_2d_contour(samples_x=samples_lf, samples_y=samples_hf, num=6, xlim=[x_min, x_max],
+                          ylim=[y_min, y_max], title='Approximate joint $p(q,Q)$', xlabel="$q$", ylabel="$Q$")
     plt.gcf().savefig('../pngout/elliptic_pde_bmfmc_fig6.png', dpi=300)
 
+    # Visualize the exact MC joint density p(q,Q)
+    samples_hf_mc = qvals[indices]
+    utils.plot_2d_scatter(samples_x=samples_lf, samples_y=samples_hf_mc, num=7, xlim=[x_min, x_max],
+                          ylim=[y_min, y_max], title='MC joint $p(q,Q)$', xlabel="$q$", ylabel="$Q$")
+    plt.gcf().savefig('../pngout/elliptic_pde_bmfmc_fig7.png', dpi=300)
+
+    # Visualize the the exact MC joint density p(q,Q) in a contour plot
+    utils.plot_2d_contour(samples_x=samples_lf, samples_y=samples_hf_mc, num=8, xlim=[x_min, x_max],
+                          ylim=[y_min, y_max], title='Approximate joint $p(q,Q)$', xlabel="$q$", ylabel="$Q$")
+    plt.gcf().savefig('../pngout/elliptic_pde_bmfmc_fig8.png', dpi=300)
+
     # Estimate p(Q) using KDE
-    q_hf = GKDE(np.ravel(samples_hf))
+    q_hf = gkde(np.ravel(samples_hf))
 
     # Plot the densities
-    q_hf_mc = GKDE(samples_hf_mc)
-    utils.plot_1d_kde(q_hf, np.min([x_min, y_min]), np.max([x_max, y_max]), linestyle='-', color='C3', num=7, label='Approximate $p(Q)$')
-    utils.plot_1d_kde(q_hf_mc, np.min([x_min, y_min]), np.max([x_max, y_max]), linestyle='--', color='C0', num=7, label='MC reference $p(Q)$')
+    q_hf_mc = gkde(samples_hf_mc)
+    utils.plot_1d_kde(q_hf, np.min([x_min, y_min]), np.max([x_max, y_max]), linestyle='-', color='C3', num=9, label='Approximate $p(Q)$')
+    utils.plot_1d_kde(q_hf_mc, np.min([x_min, y_min]), np.max([x_max, y_max]), linestyle='--', color='C0', num=9, label='MC reference $p(Q)$')
     utils.plot_1d_kde(q_lf, np.min([x_min, y_min]), np.max([x_max, y_max]), linestyle='--', color='k', xlabel='$q$ / $Q$', ylabel='$p(q)$ / $p(Q)$',
-                      num=7, label='Approximate $p(q)$', title='KDE densities')
-    plt.gcf().savefig('../pngout/elliptic_pde_bmfmc_fig7.png', dpi=300)
+                      num=9, label='Approximate $p(q)$', title='KDE densities')
+    plt.gcf().savefig('../pngout/elliptic_pde_bmfmc_fig9.png', dpi=300)
 
     # Print some statistics
     utils.print_bmfmc_stats(samples_hf_mc, samples_hf, samples_lf)
@@ -162,10 +160,10 @@ def create_bmfmc_density(n_hf, fun=lambda x: x):
 
     # Plot the CDFs
     utils.plot_1d_data(y_range, cdf_mean, linestyle='-', color='C3',
-                       num=8, label='Approximate mean')
+                       num=10, label='Approximate mean')
     utils.plot_1d_data(y_range, cdf_mc, linestyle='--', color='C0', xlabel='$Q_0$', ylabel='Pr$[Q \leq Q_0]$',
-                       num=8, label='MC mean', title='Estimated CDF')
-    plt.gcf().savefig('../pngout/elliptic_pde_bmfmc_fig8.png', dpi=300)
+                       num=10, label='MC mean', title='Estimated CDF')
+    plt.gcf().savefig('../pngout/elliptic_pde_bmfmc_fig10.png', dpi=300)
 
     # Return outputs
     return q_hf, samples_hf, lam_lf
