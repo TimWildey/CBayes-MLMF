@@ -1,0 +1,6 @@
+.DS_Store
+/pngout/*
+/texout/*
+/bmfmc/__pycache__/
+/models/__pycache__/
+/cbayes/__pycache__/
