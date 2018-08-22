@@ -18,6 +18,7 @@ Includes the CBayes inversion method:
 Includes some model problems (high- and low-fidelity included) to generate samples from:
 * elliptic_pde.py: the single-phase incompressible flow model
 * lambda_p.py: the polynomial lambda^p problem
+* ode_pp.py: a preditor-prey ODE model with 4 random variables
 
 ## pngout/
 Figures are stored in here as PNGs.
