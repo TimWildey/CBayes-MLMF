@@ -43,11 +43,11 @@ def plot_1d_kde(qkde, xmin=0.0, xmax=1.0, linestyle='-', linewidth=3, color='C0'
     plt.grid()
     plt.legend(loc='upper left')
     plt.title(title)
-    plt.gcf().set_figheight(6)
-    plt.gcf().set_figwidth(6)
+    # plt.gcf().set_figheight(6)
+    # plt.gcf().set_figwidth(6)
 
 
-def plot_1d_hist(samples, num=1, title=''):
+def plot_1d_hist(samples, num=1, title='', xlabel='$x$', ylabel='$p(x)$'):
 
     if len(str(num)) >= 3:
         plt.subplot(num)
@@ -55,8 +55,8 @@ def plot_1d_hist(samples, num=1, title=''):
         plt.figure(num)
 
     plt.hist(samples, 20, facecolor='C0', alpha=0.5, label=r'Histogram', density=1)
-    plt.xlabel(r'$x$')
-    plt.ylabel(r'$p \left( x \right)$')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     plt.grid()
     plt.legend(loc='upper left')
     plt.title(title)
@@ -151,4 +151,18 @@ def print_bmfmc_stats(samples_hf_mc, samples_hf, samples_lf):
     print('BMFMC std: ' + str(np.std(samples_hf)))
     print('Low-fidelity mean: ' + str(np.mean(samples_lf)))
     print('Low-fidelity std: ' + str(np.std(samples_lf)))
+    print('')
+
+
+def print_bmfmc_stats_2lf(samples_hf_mc, samples_hf, samples_lf_1, samples_lf_2):
+    print('')
+    print('################### BMFMC statistics:')
+    print('MC mean: ' + str(np.mean(samples_hf_mc)))
+    print('MC std: ' + str(np.std(samples_hf_mc)))
+    print('BMFMC mean: ' + str(np.mean(samples_hf)))
+    print('BMFMC std: ' + str(np.std(samples_hf)))
+    print('Low-fidelity 1 mean: ' + str(np.mean(samples_lf_1)))
+    print('Low-fidelity 1 std: ' + str(np.std(samples_lf_1)))
+    print('Low-fidelity 2 mean: ' + str(np.mean(samples_lf_2)))
+    print('Low-fidelity 2 std: ' + str(np.std(samples_lf_2)))
     print('')

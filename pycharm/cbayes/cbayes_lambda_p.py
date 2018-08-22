@@ -94,6 +94,9 @@ sb_poplot = plt.plot(qplot, sb_postq_nl_kde(qplot), 'g--', linewidth=4, label="P
 
 plt.xlim([-1, 1]), plt.xlabel("Quantity of interest"), plt.legend()
 
+accept_rate = samples_to_keep_linear.size / lam.shape[0]
+print('Acceptance rate: ' + str(accept_rate))
+
 print(np.mean(post_q_linear))
 print(np.sqrt(np.var(post_q_linear)))
 print(np.mean(r_linear))

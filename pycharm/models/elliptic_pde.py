@@ -28,6 +28,11 @@ def load_data():
     return lam, qvals
 
 
+def get_prior_samples():
+    lam, qvals = load_data()
+    return lam
+
+
 def construct_lowfi_model(X_train, y_train):
 
     # Fit a simple GP as a surrogate to the deterministic forward problem
