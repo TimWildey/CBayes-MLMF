@@ -24,8 +24,8 @@ def plot_1d_data(x, y, marker='None', markersize=5, linestyle='-', linewidth=3, 
     plt.grid()
     plt.legend(loc='upper left')
     plt.title(title)
-    plt.gcf().set_figheight(6)
-    plt.gcf().set_figwidth(6)
+    # plt.gcf().set_figheight(6)
+    # plt.gcf().set_figwidth(6)
 
 
 def plot_1d_kde(qkde, xmin=0.0, xmax=1.0, linestyle='-', linewidth=3, color='C0', num=1,
@@ -60,8 +60,8 @@ def plot_1d_hist(samples, num=1, title='', xlabel='$x$', ylabel='$p(x)$'):
     plt.grid()
     plt.legend(loc='upper left')
     plt.title(title)
-    plt.gcf().set_figheight(6)
-    plt.gcf().set_figwidth(6)
+    # plt.gcf().set_figheight(6)
+    # plt.gcf().set_figwidth(6)
 
 
 def plot_1d_conf(x_pred, y_pred, sigma, num=1, title=''):
@@ -82,8 +82,8 @@ def plot_1d_conf(x_pred, y_pred, sigma, num=1, title=''):
     plt.grid()
     plt.legend(loc='upper left')
     plt.title(title)
-    plt.gcf().set_figheight(6)
-    plt.gcf().set_figwidth(6)
+    # plt.gcf().set_figheight(6)
+    # plt.gcf().set_figwidth(6)
 
 
 def plot_2d_scatter(samples_x, samples_y, marker='o', num=1, title='', xlim=[], ylim=[], xlabel="$x$", ylabel="$y$"):
@@ -112,8 +112,8 @@ def plot_2d_scatter(samples_x, samples_y, marker='o', num=1, title='', xlim=[], 
     plt.xlim(xlim)
     plt.ylim(ylim)
     plt.title(title)
-    plt.gcf().set_figheight(6)
-    plt.gcf().set_figwidth(6)
+    # plt.gcf().set_figheight(6)
+    # plt.gcf().set_figwidth(6)
 
 
 def plot_2d_contour(samples_x, samples_y, num=1, title='', xlim=[], ylim=[], xlabel="$x$", ylabel="$y$"):
@@ -122,6 +122,12 @@ def plot_2d_contour(samples_x, samples_y, num=1, title='', xlim=[], ylim=[], xla
         plt.subplot(num)
     else:
         plt.figure(num)
+
+    if len(xlim) == 0:
+        xlim = [np.min(samples_x), np.max(samples_x)]
+
+    if len(ylim) == 0:
+        ylim = [np.min(samples_y), np.max(samples_y)]
 
     xy_kde = gkde(np.vstack([samples_x, samples_y]))
     xx, yy = np.meshgrid(np.linspace(xlim[0], xlim[1], 80), np.linspace(ylim[0], ylim[1], 80))
@@ -138,8 +144,8 @@ def plot_2d_contour(samples_x, samples_y, num=1, title='', xlim=[], ylim=[], xla
     plt.xlim(xlim)
     plt.ylim(ylim)
     plt.title(title)
-    plt.gcf().set_figheight(6)
-    plt.gcf().set_figwidth(6)
+    # plt.gcf().set_figheight(6)
+    # plt.gcf().set_figwidth(6)
 
 
 def print_bmfmc_stats(samples_hf_mc, samples_hf, samples_lf):

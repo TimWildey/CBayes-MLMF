@@ -21,7 +21,8 @@ def load_data():
     filepath = os.path.abspath(os.path.dirname(__file__))
     data_set = sio.loadmat(filepath + '/elliptic_kde100_10K.mat')
     qvals = data_set['qq']  # QoI samples, shape (10k, 3)
-    qvals = qvals[:, 0]  # Only using first QoI here --> (10k,)
+    qvals = qvals[:, 0]  # Only using first QoI here --> (10k, 1)
+    qvals = np.reshape(qvals, (len(qvals), 1))
     lam = data_set['pp']  # Random parameter samples
     lam = np.transpose(lam)  # reshape to (10k, 100)
 
@@ -41,6 +42,16 @@ def construct_lowfi_model(X_train, y_train):
     gp.fit(X_train, y_train)
 
     return gp
+
+
+def construct_lowfi_model_and_get_samples(X_train, y_train, X_test):
+
+    # Fit a simple GP as a surrogate to the deterministic forward problem
+    kernel = Matern()
+    gp = gaussian_process.GaussianProcessRegressor(kernel=kernel)
+    gp.fit(X_train, y_train)
+
+    return gp.predict(X_test)
 
 
 def get_lowfi_samples(gp, X_test, n_lf, fun=lambda x: x):
@@ -68,6 +79,13 @@ def get_highfi_samples(y, indices):
     qvals_highfi = y[indices]
 
     return qvals_highfi
+
+
+def find_xy_pair(x, X, Y):
+
+    idx = np.where((X == x).all(axis=1))[0][0]
+
+    return Y[idx, :]
 
 
 # Exemplary usage
