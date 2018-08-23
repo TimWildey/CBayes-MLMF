@@ -1,6 +1,10 @@
 .DS_Store
-/pngout/*
-/texout/*
-/bmfmc/__pycache__/
-/models/__pycache__/
-/cbayes/__pycache__/
+/cbayes-bmfmc-oo/__pycache__/
+/cbayes-bmfmc-oo/models/__pycache__/
+/cbayes-bmfmc-oo/pngout/*
+/test_scripts/pngout/*
+/test_scripts/texout/*
+/test_scripts/bmfmc/__pycache__/
+/test_scripts/models/__pycache__/
+/test_scripts/cbayes/__pycache__/
+/.idea/
