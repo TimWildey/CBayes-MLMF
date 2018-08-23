@@ -75,6 +75,10 @@ def ode_pp(params, settings):
     return sol
 
 
+def get_prior_samples(n_samples):
+    return np.random.uniform(low=0.4, high=0.6, size=(n_samples, 4))
+
+
 if __name__ == '__main__':
 
     # Model settings

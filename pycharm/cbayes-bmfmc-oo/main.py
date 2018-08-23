@@ -10,16 +10,17 @@ from BMFMC import BMFMC
 # Model stuff
 import lambda_p
 import elliptic_pde
+import ode_pp
 
 # ----------------------------------------------------------- Config -------- #
 #
 # General
 #
 n_samples = int(1e4)                            # 1e4 should suffice
-model = 'elliptic_pde'                          # lambda_p, elliptic_pde, ode_pp
+model = 'ode_pp'                                # lambda_p, elliptic_pde, ode_pp
 pf_method = 'bmfmc'                             # mc, bmfmc
-obs_loc = 0.7                                   # lambda_p: 0.25, elliptic_pde: 0.7
-obs_scale = 0.01                                # lambda_p: 0.1, elliptic_pde: 0.01
+obs_loc = 2.5                                   # lambda_p: 0.25, elliptic_pde: 0.7, ode_pp: 2.5
+obs_scale = 0.1                                 # lambda_p: 0.1, elliptic_pde: 0.01, ode_pp: 0.1
 #
 # BMFMC specific
 #
@@ -29,6 +30,8 @@ regression_type = 'gaussian_process'            # gaussian_process
 #
 # --------------------------------------------------------------------------- #
 
+# todo: add support for a hierarchy of low-fidelity models (some parts are already there)
+# todo: add support for multiple QoIs (some parts are already there)
 
 # ------------------------------------------------- Models & Methods -------- #
 #
@@ -150,8 +153,61 @@ def get_prior_prior_pf_samples(n_samples):
             exit()
 
     elif model == 'ode_pp':
-        print('not implemented yet')
-        exit()
+
+        n_qoi = 1
+        prior_samples = ode_pp.get_prior_samples(n_samples)
+
+        # Model settings
+        u0 = np.array([5, 1])
+        finalt = 1.0
+        dt_hf = 0.01
+        dt_lf = 0.9
+
+        hf_settings = ode_pp.Settings(finalt=finalt, dt=dt_hf, u0=u0)
+
+        if pf_method == 'mc':
+
+            # Create the high-fidelity model
+            hf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, hf_settings)[0, -1], rv_samples=prior_samples,
+                             n_evals=n_samples, n_qoi=n_qoi, rv_name='Q', label='High-fidelity')
+
+            # Brute force Monte Carlo
+            prior_pf_samples = hf_model.evaluate()
+
+        elif pf_method == 'bmfmc':
+
+            # Create a low-fidelity model
+            lf_settings = ode_pp.Settings(finalt=finalt, dt=dt_lf, u0=u0)
+            lf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, lf_settings)[0, -1], rv_samples=prior_samples,
+                             rv_samples_pred=prior_samples, n_evals=n_samples, n_qoi=n_qoi,
+                             rv_name='q', label='Low-fidelity')
+
+            # Create a high-fidelity model
+            hf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, hf_settings)[0, -1], n_evals=n_evals, n_qoi=n_qoi,
+                             rv_name='Q', label='High-fidelity')
+
+            # Setup BMFMC
+            bmfmc = BMFMC(models=[lf_model, hf_model],
+                          training_set_strategy=training_set_strategy, regression_type=regression_type)
+
+            # Apply BMFMC
+            bmfmc.apply_bmfmc_framework()
+
+            # Calculate Monte Carlo reference
+            bmfmc.calculate_mc_reference()
+
+            # Diagnostics
+            bmfmc.print_stats_with_mc()
+            bmfmc.plot_results_with_mc()
+            bmfmc.plot_regression_models()
+            bmfmc.plot_joint_densities()
+
+            # Get prior push-forward samples
+            prior_pf_samples = bmfmc.get_high_fidelity_samples()
+
+        else:
+            print('Unknown push-forward method: %r' % pf_method)
+            exit()
 
     else:
         print('Unknown model: %r' % model)
