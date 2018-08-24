@@ -163,6 +163,7 @@ class BMFMC:
         if mc and self.mc_model != 0:
             print('MC mean:\t\t\t\t\t\t%f' % np.mean(self.mc_model.model_evals_pred))
             print('MC std:\t\t\t\t\t\t\t%f' % np.std(self.mc_model.model_evals_pred))
+            print('')
             print('MC-BMFMC KL:\t\t\t\t\t%f' % np.mean(
                 np.log(self.models[-1].distribution.kernel_density(np.squeeze(self.models[-1].model_evals_pred)) /
                        self.mc_model.distribution.kernel_density(np.squeeze(self.mc_model.model_evals_pred)))))
@@ -170,15 +171,32 @@ class BMFMC:
             print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
             exit()
         print('')
-        print('High-fidelity mean:\t\t\t\t%f' % np.mean(self.models[-1].model_evals_pred))
-        print('High-fidelity std:\t\t\t\t%f' % np.std(self.models[-1].model_evals_pred))
+        print('Low-fidelity mean:\t\t\t\t%f' % np.mean(self.models[0].model_evals_pred))
+        print('Low-fidelity std:\t\t\t\t%f' % np.std(self.models[0].model_evals_pred))
         print('')
+        kl_sum = 0.0
         for i in range(self.n_models-2):
             print('Mid-%d-fidelity mean:\t\t\t%f' % (int(i+1), np.mean(self.models[i+1].model_evals_pred)))
             print('Mid-%d-fidelity std:\t\t\t\t%f' % (int(i+1), np.std(self.models[i+1].model_evals_pred)))
+            print('')
+            kl = np.mean(
+                np.log(self.models[i].distribution.kernel_density(np.squeeze(self.models[i].model_evals_pred)) /
+                       self.models[i + 1].distribution.kernel_density(np.squeeze(self.models[i + 1].model_evals_pred))))
+            print('Relative information gain:\t\t%f' % kl)
+            print('')
+            kl_sum += kl
+        print('High-fidelity mean:\t\t\t\t%f' % np.mean(self.models[-1].model_evals_pred))
+        print('High-fidelity std:\t\t\t\t%f' % np.std(self.models[-1].model_evals_pred))
         print('')
-        print('Low-fidelity mean:\t\t\t\t%f' % np.mean(self.models[0].model_evals_pred))
-        print('Low-fidelity std:\t\t\t\t%f' % np.std(self.models[0].model_evals_pred))
+        kl = np.mean(
+            np.log(self.models[-2].distribution.kernel_density(np.squeeze(self.models[-2].model_evals_pred)) /
+                   self.models[-1].distribution.kernel_density(np.squeeze(self.models[-1].model_evals_pred))))
+        kl_sum += kl
+        print('Relative information gain:\t\t%f' % kl)
+        print('Total information gain (calc):\t%f' % np.mean(
+            np.log(self.models[0].distribution.kernel_density(np.squeeze(self.models[0].model_evals_pred)) /
+                   self.models[-1].distribution.kernel_density(np.squeeze(self.models[-1].model_evals_pred)))))
+        print('Total information gain (sum):\t%f' % kl_sum)
         print('')
         print('########################################')
         print('')

@@ -1,15 +1,16 @@
 # Standard stuff
 import numpy as np
 
-import elliptic_pde
 # Model stuff
 import lambda_p
+import elliptic_pde
 import ode_pp
-from BMFMC import BMFMC
-from CBayes import CBayesPosterior
+
 # Framework stuff
 from Distribution import Distribution
 from Model import Model
+from BMFMC import BMFMC
+from CBayes import CBayesPosterior
 
 # ------------------------------------------------- Config - General -------- #
 
@@ -37,12 +38,13 @@ training_set_strategy = 'support_covering'
 # Regression model type (gaussian_process)
 regression_type = 'gaussian_process'
 
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------- Todos ---------- #
 
-# todo: add information gain measure (KL) between the different levels
-# todo: add support for multiple QoIs (some parts are already there)
+# todo: figure out why the KL between low- and high- model is equal to the sum of the KL between all intermediate ones
 # todo: compare high-fidelity with low-fidelity cbayes solutions
-# todo: check out other regression models
+# todo: implement adaptive training set selection procedure (requires some measure of information gain)
+# todo: add support for multiple QoIs (some parts are already there)
+# todo: implement other regression models
 
 # ------------------------------------------------- Models & Methods -------- #
 
