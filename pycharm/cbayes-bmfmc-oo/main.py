@@ -1,45 +1,55 @@
 # Standard stuff
 import numpy as np
 
+import elliptic_pde
+# Model stuff
+import lambda_p
+import ode_pp
+from BMFMC import BMFMC
+from CBayes import CBayesPosterior
 # Framework stuff
 from Distribution import Distribution
 from Model import Model
-from CBayes import CBayesPosterior
-from BMFMC import BMFMC
 
-# Model stuff
-import lambda_p
-import elliptic_pde
-import ode_pp
+# ------------------------------------------------- Config - General -------- #
 
-# ----------------------------------------------------------- Config -------- #
-#
-# General
-#
-n_samples = int(1e4)                            # 1e4 should suffice
-model = 'ode_pp'                                # lambda_p, elliptic_pde, ode_pp
-pf_method = 'bmfmc'                             # mc, bmfmc
-obs_loc = 2.5                                   # lambda_p: 0.25, elliptic_pde: 0.7, ode_pp: 2.5
-obs_scale = 0.1                                 # lambda_p: 0.1, elliptic_pde: 0.01, ode_pp: 0.1
-#
-# BMFMC specific
-#
-n_evals = 50                                    # [20, 100] (the lowest-fidelity model will always have n_samples evals)
-training_set_strategy = 'support_covering'      # support_covering, sampling
-regression_type = 'gaussian_process'            # gaussian_process
-#
+# Number of lowest-fidelity samples (1e4 should be fine for 1 QoI)
+n_samples = int(1e4)
+
+# Forward model (lambda_p, ellptic_pde, ode_pp)
+model = 'lambda_p'
+
+# Push-forward method (mc, bmfmc)
+pf_method = 'bmfmc'
+
+# ----------------------------------------------------Config - BMFMC -------- #
+
+# Number of model evaluations [20, 100] (the lowest-fidelity model will always have n_samples evals)
+n_evals = 50
+
+# Training set selection strategy (support_covering, sampling)
+training_set_strategy = 'support_covering'
+
+# Regression model type (gaussian_process)
+regression_type = 'gaussian_process'
+
 # --------------------------------------------------------------------------- #
 
 # todo: add support for a hierarchy of low-fidelity models (some parts are already there)
 # todo: add support for multiple QoIs (some parts are already there)
+# todo: check out other regression models
 
 # ------------------------------------------------- Models & Methods -------- #
-#
+
 def get_prior_prior_pf_samples(n_samples):
+
     prior_samples = prior_pf_samples = []
 
     if model == 'lambda_p':
+
         n_qoi = 1
+        obs_loc = 0.25
+        obs_scale = 0.1
         prior_samples = lambda_p.get_prior_samples(n_samples)
 
         if pf_method == 'mc':
@@ -88,6 +98,8 @@ def get_prior_prior_pf_samples(n_samples):
     elif model == 'elliptic_pde':
 
         n_qoi = 1
+        obs_loc = 0.7
+        obs_scale = 0.01
 
         # Load dataset
         lam, qvals = elliptic_pde.load_data()
@@ -155,6 +167,8 @@ def get_prior_prior_pf_samples(n_samples):
     elif model == 'ode_pp':
 
         n_qoi = 1
+        obs_loc = 2.5
+        obs_scale = 0.1
         prior_samples = ode_pp.get_prior_samples(n_samples)
 
         # Model settings
@@ -213,18 +227,18 @@ def get_prior_prior_pf_samples(n_samples):
         print('Unknown model: %r' % model)
         exit()
 
-    return prior_samples, prior_pf_samples
-#
+    return prior_samples, prior_pf_samples, obs_loc, obs_scale
+
 # --------------------------------------------------------------------------- #
 
 
 # ------------------------------------------------------------- Main -------- #
-#
+
 if __name__ == '__main__':
 
     # Get samples from the prior, its push-forward and the observed density
     print('\nCalculating the Prior push-forward ...')
-    prior_samples, prior_pf_samples = get_prior_prior_pf_samples(n_samples)
+    prior_samples, prior_pf_samples, obs_loc, obs_scale = get_prior_prior_pf_samples(n_samples)
 
     # Prior
     p_prior = Distribution(prior_samples, rv_name='$\lambda$', label='Prior', kde=False)
@@ -247,5 +261,5 @@ if __name__ == '__main__':
 
     # Plot
     cbayes_post.plot_results(1)
-#
+
 # --------------------------------------------------------------------------- #

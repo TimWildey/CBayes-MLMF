@@ -1,9 +1,10 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import gaussian_process
 from sklearn.gaussian_process.kernels import WhiteKernel, RBF, ConstantKernel, Product, DotProduct
-import matplotlib.pyplot as plt
-from Model import Model
+
 import utils
+from Model import Model
 
 
 class BMFMC:
@@ -76,10 +77,13 @@ class BMFMC:
 
             hf_model.set_rv_samples(hf_rv_samples)
 
-        elif self.training_set_strategy == 'samples':
+        elif self.training_set_strategy == 'sampling':
 
-            print('Not implemented yet.')
-            exit()
+            # Get some random variable samples
+            indices = np.random.choice(range(lf_model.rv_samples_pred.shape[0]), size=hf_model.n_evals, replace=False)
+            x_train = lf_model.model_evals_pred[indices, :]
+            hf_rv_samples = lf_model.rv_samples_pred[indices, :]
+            hf_model.set_rv_samples(hf_rv_samples)
 
         else:
             print('Unknown training set selection strategy.')
@@ -151,6 +155,9 @@ class BMFMC:
         print('BMFMC std:\t\t\t\t\t\t%f' % np.std(self.models[-1].model_evals_pred))
         print('Low-fidelity mean:\t\t\t\t%f' % np.mean(self.models[0].model_evals_pred))
         print('Low-fidelity std:\t\t\t\t%f' % np.std(self.models[0].model_evals_pred))
+        print('BMFMC-MC KL:\t\t\t\t\t%f' % np.mean(
+            np.log(self.models[-1].distribution.kernel_density(np.squeeze(self.models[-1].model_evals_pred)) /
+                   self.mc_model.distribution.kernel_density(np.squeeze(self.mc_model.model_evals_pred)))))
         print('\n########################################')
         print('')
 
