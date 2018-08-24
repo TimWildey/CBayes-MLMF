@@ -17,15 +17,19 @@ from Model import Model
 n_samples = int(1e4)
 
 # Forward model (lambda_p, ellptic_pde, ode_pp)
-model = 'lambda_p'
+model = 'ode_pp'
 
 # Push-forward method (mc, bmfmc)
 pf_method = 'bmfmc'
 
 # ----------------------------------------------------Config - BMFMC -------- #
 
-# Number of model evaluations [20, 100] (the lowest-fidelity model will always have n_samples evals)
-n_evals = 50
+# Number of model evaluations in increasing fidelity (the lowest-fidelity model will always have n_samples evals)
+# Only lambda_p and ode_pp support more than one (i.e. arbitrary many) low-fidelity level
+# The number of models will thus be len(n_evals) + 1
+n_evals = [500, 100, 20]
+# n_evals = [100, 10]
+# n_evals = [10]
 
 # Training set selection strategy (support_covering, sampling)
 training_set_strategy = 'support_covering'
@@ -35,14 +39,14 @@ regression_type = 'gaussian_process'
 
 # --------------------------------------------------------------------------- #
 
-# todo: add support for a hierarchy of low-fidelity models (some parts are already there)
+# todo: add information gain measure (KL) between the different levels
 # todo: add support for multiple QoIs (some parts are already there)
+# todo: compare high-fidelity with low-fidelity cbayes solutions
 # todo: check out other regression models
 
 # ------------------------------------------------- Models & Methods -------- #
 
 def get_prior_prior_pf_samples(n_samples):
-
     prior_samples = prior_pf_samples = []
 
     if model == 'lambda_p':
@@ -56,7 +60,7 @@ def get_prior_prior_pf_samples(n_samples):
 
             # Create the high-fidelity model
             hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 5), rv_samples=prior_samples,
-                             n_evals=n_samples, n_qoi=n_qoi, rv_name='Q', label='High-fidelity')
+                             n_evals=n_samples, n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
             # Brute force Monte Carlo
             prior_pf_samples = hf_model.evaluate()
@@ -64,16 +68,38 @@ def get_prior_prior_pf_samples(n_samples):
         elif pf_method == 'bmfmc':
 
             # Create a low-fidelity model
-            lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 3), rv_samples=prior_samples,
+            lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 1), rv_samples=prior_samples,
                              rv_samples_pred=prior_samples, n_evals=n_samples, n_qoi=n_qoi,
-                             rv_name='q', label='Low-fidelity')
+                             rv_name='$q_0$', label='Low-fidelity')
 
             # Create a high-fidelity model
-            hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 5), n_evals=n_evals, n_qoi=n_qoi,
-                             rv_name='Q', label='High-fidelity')
+            hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, len(n_evals) * 2 + 1), n_evals=n_evals[-1],
+                             n_qoi=n_qoi,
+                             rv_name='$Q$', label='High-fidelity')
+
+            if len(n_evals) == 2:
+                # Create a mid fidelity model
+                mf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 3), n_evals=n_evals[0], n_qoi=n_qoi,
+                                 rv_name='$q_m$', label='Mid-fidelity')
+                models = [lf_model, mf_model, hf_model]
+
+            elif len(n_evals) > 2:
+                models = [lf_model]
+                for i in range(len(n_evals) - 1):
+                    models.append(
+                        Model(eval_fun=lambda x, i=i: lambda_p.lambda_p(x, (i + 1) * 2 + 1), n_evals=n_evals[i],
+                              n_qoi=n_qoi, rv_name='$q_%d$' % int(i + 1), label='Mid-%d-fidelity' % int(i + 1)))
+                models.append(hf_model)
+
+            elif len(n_evals) == 1:
+                models = [lf_model, hf_model]
+
+            else:
+                print('Unsupported number of models for lambda_p.')
+                exit()
 
             # Setup BMFMC
-            bmfmc = BMFMC(models=[lf_model, hf_model],
+            bmfmc = BMFMC(models=models,
                           training_set_strategy=training_set_strategy, regression_type=regression_type)
 
             # Apply BMFMC
@@ -83,8 +109,8 @@ def get_prior_prior_pf_samples(n_samples):
             bmfmc.calculate_mc_reference()
 
             # Diagnostics
-            bmfmc.print_stats_with_mc()
-            bmfmc.plot_results_with_mc()
+            bmfmc.print_stats(mc=True)
+            bmfmc.plot_results(mc=True)
             bmfmc.plot_regression_models()
             bmfmc.plot_joint_densities()
 
@@ -133,13 +159,13 @@ def get_prior_prior_pf_samples(n_samples):
 
             lf_model = Model(eval_fun=lambda x: elliptic_pde.find_xy_pair(x, prior_samples, lf_samples),
                              rv_samples=prior_samples, rv_samples_pred=prior_samples, n_evals=n_samples, n_qoi=n_qoi,
-                             rv_name='q', label='Low-fidelity')
+                             rv_name='$q$', label='Low-fidelity')
 
             # High-fi model samples
             hf_samples = prior_pf_samples[indices, :]
 
             hf_model = Model(eval_fun=lambda x: elliptic_pde.find_xy_pair(x, prior_samples, hf_samples),
-                             n_evals=n_evals, n_qoi=n_qoi, rv_name='Q', label='High-fidelity')
+                             n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
             # Setup BMFMC
             bmfmc = BMFMC(models=[lf_model, hf_model],
@@ -152,8 +178,8 @@ def get_prior_prior_pf_samples(n_samples):
             bmfmc.calculate_mc_reference()
 
             # Diagnostics
-            bmfmc.print_stats_with_mc()
-            bmfmc.plot_results_with_mc()
+            bmfmc.print_stats(mc=True)
+            bmfmc.plot_results(mc=True)
             bmfmc.plot_regression_models()
             bmfmc.plot_joint_densities()
 
@@ -174,8 +200,7 @@ def get_prior_prior_pf_samples(n_samples):
         # Model settings
         u0 = np.array([5, 1])
         finalt = 1.0
-        dt_hf = 0.01
-        dt_lf = 0.9
+        dt_hf = 0.5
 
         hf_settings = ode_pp.Settings(finalt=finalt, dt=dt_hf, u0=u0)
 
@@ -183,7 +208,7 @@ def get_prior_prior_pf_samples(n_samples):
 
             # Create the high-fidelity model
             hf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, hf_settings)[0, -1], rv_samples=prior_samples,
-                             n_evals=n_samples, n_qoi=n_qoi, rv_name='Q', label='High-fidelity')
+                             n_evals=n_samples, n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
             # Brute force Monte Carlo
             prior_pf_samples = hf_model.evaluate()
@@ -191,17 +216,45 @@ def get_prior_prior_pf_samples(n_samples):
         elif pf_method == 'bmfmc':
 
             # Create a low-fidelity model
+            dt_lf = 1.0
             lf_settings = ode_pp.Settings(finalt=finalt, dt=dt_lf, u0=u0)
             lf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, lf_settings)[0, -1], rv_samples=prior_samples,
                              rv_samples_pred=prior_samples, n_evals=n_samples, n_qoi=n_qoi,
-                             rv_name='q', label='Low-fidelity')
+                             rv_name='$q_0$', label='Low-fidelity')
 
             # Create a high-fidelity model
-            hf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, hf_settings)[0, -1], n_evals=n_evals, n_qoi=n_qoi,
-                             rv_name='Q', label='High-fidelity')
+            hf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, hf_settings)[0, -1], n_evals=n_evals[-1], n_qoi=n_qoi,
+                             rv_name='$Q$', label='High-fidelity')
+
+            if len(n_evals) == 2:
+                # Create a mid fidelity model
+                dt_mf = 0.7
+                mf_settings = ode_pp.Settings(finalt=finalt, dt=dt_mf, u0=u0)
+                mf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, mf_settings)[0, -1], n_evals=n_evals[0],
+                                 n_qoi=n_qoi, rv_name='$q_m$', label='Mid-fidelity')
+                models = [lf_model, mf_model, hf_model]
+
+            elif len(n_evals) > 2:
+                models = [lf_model]
+                dts = np.linspace(dt_lf, dt_hf, len(n_evals) + 2)
+                # dts = [dt_lf, 0.9, 0.6, dt_hf]
+                for i in range(len(n_evals) - 1):
+                    settings = ode_pp.Settings(finalt=finalt, dt=dts[i + 1], u0=u0)
+                    models.append(Model(eval_fun=lambda x, settings=settings: ode_pp.ode_pp(x, settings)[0, -1],
+                                        n_evals=n_evals[i],
+                                        n_qoi=n_qoi, rv_name='$q_%d$' % int(i + 1),
+                                        label='Mid-%d-fidelity' % int(i + 1)))
+                models.append(hf_model)
+
+            elif len(n_evals) == 1:
+                models = [lf_model, hf_model]
+
+            else:
+                print('Unsupported number of models for ode_pp.')
+                exit()
 
             # Setup BMFMC
-            bmfmc = BMFMC(models=[lf_model, hf_model],
+            bmfmc = BMFMC(models=models,
                           training_set_strategy=training_set_strategy, regression_type=regression_type)
 
             # Apply BMFMC
@@ -211,8 +264,8 @@ def get_prior_prior_pf_samples(n_samples):
             bmfmc.calculate_mc_reference()
 
             # Diagnostics
-            bmfmc.print_stats_with_mc()
-            bmfmc.plot_results_with_mc()
+            bmfmc.print_stats(mc=True)
+            bmfmc.plot_results(mc=True)
             bmfmc.plot_regression_models()
             bmfmc.plot_joint_densities()
 
@@ -229,6 +282,7 @@ def get_prior_prior_pf_samples(n_samples):
 
     return prior_samples, prior_pf_samples, obs_loc, obs_scale
 
+
 # --------------------------------------------------------------------------- #
 
 
@@ -237,7 +291,8 @@ def get_prior_prior_pf_samples(n_samples):
 if __name__ == '__main__':
 
     # Get samples from the prior, its push-forward and the observed density
-    print('\nCalculating the Prior push-forward ...')
+    print('')
+    print('Calculating the Prior push-forward ...')
     prior_samples, prior_pf_samples, obs_loc, obs_scale = get_prior_prior_pf_samples(n_samples)
 
     # Prior

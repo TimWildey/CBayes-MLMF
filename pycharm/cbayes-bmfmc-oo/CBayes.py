@@ -1,5 +1,6 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+
 from Distribution import Distribution
 
 
@@ -77,7 +78,8 @@ class CBayesPosterior:
     def print_stats(self):
 
         print('')
-        print('########### CBayes statistics ##########\n')
+        print('########### CBayes statistics ##########')
+        print('')
 
         # The rejection sampling acceptance rate
         print('Acceptance rate:\t\t\t\t%f' % self.acc_rate )
@@ -100,7 +102,8 @@ class CBayesPosterior:
         # (add a very small number to avoid taking log(0))
         print('Posterior-Prior KL:\t\t\t\t%f' % np.mean(self.r * np.log(self.r + 1e-10)))
 
-        print('\n########################################')
+        print('')
+        print('########################################')
         print('')
 
     # Plot results

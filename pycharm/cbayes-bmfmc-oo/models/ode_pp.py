@@ -1,6 +1,7 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import math
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 # Lotka - Volterra PP Model
@@ -84,9 +85,10 @@ if __name__ == '__main__':
     # Model settings
     u0 = np.array([5, 1])
     finalt = 1.0
-    dt_hf = 0.01
-    dt_lf_1 = 0.7
-    dt_lf_2 = 0.9
+    dt_hf = 0.1
+    dt_lf_2 = 0.6
+    dt_lf_1 = 0.9
+    dt_lf_0 = 1.0
 
     # Samples
     n_hf = 200
@@ -98,6 +100,13 @@ if __name__ == '__main__':
     for i in range(n_hf):
         hf_sol[i, :, :] = ode_pp(samples[i, :], hf_settings)
 
+    # Low-fidelity model 2
+    n_lf_2 = n_hf
+    lf_2_settings = Settings(finalt=finalt, dt=dt_lf_2, u0=u0)
+    lf_2_sol = np.zeros((n_lf_2, len(lf_2_settings.u0), lf_2_settings.nt + 1))
+    for i in range(n_lf_2):
+        lf_2_sol[i, :, :] = ode_pp(samples[i, :], lf_2_settings)
+
     # Low-fidelity model 1
     n_lf_1 = n_hf
     lf_1_settings = Settings(finalt=finalt, dt=dt_lf_1, u0=u0)
@@ -105,12 +114,12 @@ if __name__ == '__main__':
     for i in range(n_lf_1):
         lf_1_sol[i, :, :] = ode_pp(samples[i, :], lf_1_settings)
 
-    # Low-fidelity model 2
-    n_lf_2 = n_hf
-    lf_2_settings = Settings(finalt=finalt, dt=dt_lf_2, u0=u0)
-    lf_2_sol = np.zeros((n_lf_2, len(lf_2_settings.u0), lf_2_settings.nt + 1))
-    for i in range(n_lf_2):
-        lf_2_sol[i, :, :] = ode_pp(samples[i, :], lf_2_settings)
+    # Low-fidelity model 0
+    n_lf_0 = n_hf
+    lf_0_settings = Settings(finalt=finalt, dt=dt_lf_0, u0=u0)
+    lf_0_sol = np.zeros((n_lf_0, len(lf_0_settings.u0), lf_0_settings.nt + 1))
+    for i in range(n_lf_0):
+        lf_0_sol[i, :, :] = ode_pp(samples[i, :], lf_0_settings)
 
     # Solution plots
     # plt.figure()
@@ -125,26 +134,33 @@ if __name__ == '__main__':
     # plt.show()
     # exit()
 
+    x0_qvals = lf_0_sol[:, 0, -1]
     x1_qvals = lf_1_sol[:, 0, -1]
     x2_qvals = lf_2_sol[:, 0, -1]
     y_qvals = hf_sol[:, 0, -1]
-    lin = np.linspace(np.min([x1_qvals, x2_qvals]), np.max([x1_qvals, x2_qvals]), len(x1_qvals))
+    lin = np.linspace(np.min([x0_qvals, y_qvals]), np.max([x0_qvals, y_qvals]), len(x1_qvals))
 
-    # Correlate x2 and x1
+    # Correlate x0 and x1
     plt.figure()
-    plt.plot(x2_qvals, x1_qvals, 'oC1', label='$x_2$ vs. $x_1$')
+    plt.plot(x0_qvals, x1_qvals, 'oC2', label='$x_0$ vs. $x_1$')
     plt.plot(lin, lin, '--k', label='$x=y$')
     plt.legend()
 
-    # Correlate x1 and y
+    # Correlate x1 and x2
     plt.figure()
-    plt.plot(x1_qvals, y_qvals, 'oC0', label='$x_1$ vs. $y$')
+    plt.plot(x1_qvals, x2_qvals, 'oC1', label='$x_1$ vs. $x_2$')
     plt.plot(lin, lin, '--k', label='$x=y$')
     plt.legend()
 
     # Correlate x2 and y
     plt.figure()
-    plt.plot(x2_qvals, y_qvals, 'oC2', label='$x_2$ vs. $y$')
+    plt.plot(x2_qvals, y_qvals, 'oC0', label='$x_1$ vs. $y$')
+    plt.plot(lin, lin, '--k', label='$x=y$')
+    plt.legend()
+
+    # Correlate x0 and y
+    plt.figure()
+    plt.plot(x0_qvals, y_qvals, 'oC3', label='$x_2$ vs. $y$')
     plt.plot(lin, lin, '--k', label='$x=y$')
     plt.legend()
 

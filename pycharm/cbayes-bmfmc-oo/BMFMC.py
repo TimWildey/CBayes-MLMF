@@ -27,10 +27,6 @@ class BMFMC:
         self.regression_models = []
         self.fignum = 10
 
-        if len(models) > 2:
-            print('More than one low-fidelity model not tested yet.')
-            exit()
-
     def apply_bmfmc_framework(self):
 
         for i in range(self.n_models-1):
@@ -45,22 +41,23 @@ class BMFMC:
                 lf_model.create_distribution()
 
             # 2) Select lower-fidelity model evaluation points and evaluate the next higher-fidelity model
-            x_train = self.create_training_set(lf_model, hf_model)
+            x_train = self.create_training_set(lf_model=lf_model, hf_model=hf_model, id=i)
             y_train = hf_model.evaluate()
 
             # 3) Fit a regression model to approximate p(q_l|q_l-1), predict q_l|q_l-1 at all low-fidelity samples,
             #    generate low-fidelity samples from the predictions and create a distribution
             hf_model_evals_pred = self.build_regression_predict_and_sample(x_train=x_train, y_train=y_train,
-                                                     x_pred=lf_model.model_evals_pred)
+                                                                           x_pred=lf_model.model_evals_pred)
             hf_model.set_rv_samples_pred(lf_model.rv_samples_pred)
             hf_model.set_model_evals_pred(hf_model_evals_pred.reshape((self.models[0].n_evals, hf_model.n_qoi)))
             hf_model.create_distribution()
 
         return self.models[-1].model_evals_pred
 
-    def create_training_set(self, lf_model, hf_model):
+    def create_training_set(self, lf_model, hf_model, id):
 
         x_train = []
+
         if self.training_set_strategy == 'support_covering':
 
             # Create a uniform grid across the support of p(q)
@@ -68,20 +65,43 @@ class BMFMC:
                                            num=hf_model.n_evals)
 
             # Find the lower-fidelity samples closest to the grid points and get the corresponding lambdas
+            # Those are only available for the lowest-fidelity model and need to be computed for any other model
             x_train = np.zeros((hf_model.n_evals, hf_model.n_qoi))
             hf_rv_samples = np.zeros((hf_model.n_evals, lf_model.n_random))
             for i in range(hf_model.n_evals):
                 idx = (np.abs(lf_model.model_evals_pred - x_train_linspace[i])).argmin()
-                x_train[i] = lf_model.model_evals_pred[idx]
+
+                if id > 0:
+                    x_train[i] = lf_model.eval_fun(lf_model.rv_samples_pred[idx, :])
+                elif id == 0:
+                    x_train[i] = lf_model.model_evals_pred[idx]
+                else:
+                    print('Invalid model id. Something went very wrong.')
+                    exit()
+
                 hf_rv_samples[i, :] = lf_model.rv_samples_pred[idx, :]
 
+            # Assign model evaluation points to the high-fidelity model
             hf_model.set_rv_samples(hf_rv_samples)
 
         elif self.training_set_strategy == 'sampling':
 
             # Get some random variable samples
             indices = np.random.choice(range(lf_model.rv_samples_pred.shape[0]), size=hf_model.n_evals, replace=False)
-            x_train = lf_model.model_evals_pred[indices, :]
+
+            # Get the corresponding lower-fidelity evaluations
+            # Those are only available for the lowest-fidelity model and need to be computed for any other model
+            if id > 0:
+                x_train = np.zeros((hf_model.n_evals, lf_model.n_qoi))
+                for i in range(hf_model.n_evals):
+                    x_train[i] = lf_model.eval_fun(lf_model.rv_samples_pred[indices[i], :])
+            elif id == 0:
+                x_train = lf_model.model_evals_pred[indices, :]
+            else:
+                print('Invalid model id. Something went very wrong.')
+                exit()
+
+            # Assign model evaluation points to the high-fidelity model
             hf_rv_samples = lf_model.rv_samples_pred[indices, :]
             hf_model.set_rv_samples(hf_rv_samples)
 
@@ -95,10 +115,12 @@ class BMFMC:
 
         hf_model_evals_pred = []
         regression_model = []
+
         if self.regression_type == 'gaussian_process':
 
             # Fit a GP regression model to approximate p(q_l|q_l-1)
             kernel = Product(RBF(), ConstantKernel()) + WhiteKernel() + ConstantKernel() + DotProduct()
+            # kernel = Matern() + WhiteKernel()
             regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel)
             regression_model.fit(x_train, y_train)
 
@@ -120,9 +142,11 @@ class BMFMC:
         return hf_model_evals_pred
 
     def get_high_fidelity_samples(self):
+
         return self.models[-1].model_evals_pred
 
     def calculate_mc_reference(self):
+
         self.mc_model = Model(eval_fun=self.models[-1].eval_fun, n_evals=self.models[0].n_evals,
                               n_qoi=self.models[-1].n_qoi, rv_samples=self.models[0].rv_samples,
                               rv_samples_pred=self.models[0].rv_samples, label='MC reference',
@@ -131,37 +155,35 @@ class BMFMC:
         self.mc_model.set_model_evals_pred(self.mc_model.model_evals)
         self.mc_model.create_distribution()
 
-    def print_stats(self):
-        print('')
-        print('########### BMFMC statistics ###########\n')
-        print('BMFMC mean:\t\t\t\t\t\t%f' % np.mean(self.models[-1].model_evals_pred))
-        print('BMFMC std:\t\t\t\t\t\t%f' % np.std(self.models[-1].model_evals_pred))
-        print('Low-fidelity mean:\t\t\t\t%f' % np.mean(self.models[0].model_evals_pred))
-        print('Low-fidelity std:\t\t\t\t%f' % np.std(self.models[0].model_evals_pred))
-        print('\n########################################')
-        print('')
+    def print_stats(self, mc=False):
 
-    def print_stats_with_mc(self):
-
-        if self.mc_model == 0:
+        print('')
+        print('########### BMFMC statistics ###########')
+        print('')
+        if mc and self.mc_model != 0:
+            print('MC mean:\t\t\t\t\t\t%f' % np.mean(self.mc_model.model_evals_pred))
+            print('MC std:\t\t\t\t\t\t\t%f' % np.std(self.mc_model.model_evals_pred))
+            print('MC-BMFMC KL:\t\t\t\t\t%f' % np.mean(
+                np.log(self.models[-1].distribution.kernel_density(np.squeeze(self.models[-1].model_evals_pred)) /
+                       self.mc_model.distribution.kernel_density(np.squeeze(self.mc_model.model_evals_pred)))))
+        elif mc and self.mc_model == 0:
             print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
             exit()
-
         print('')
-        print('########### BMFMC statistics ###########\n')
-        print('MC mean:\t\t\t\t\t\t%f' % np.mean(self.mc_model.model_evals_pred))
-        print('MC std:\t\t\t\t\t\t\t%f' % np.std(self.mc_model.model_evals_pred))
-        print('BMFMC mean:\t\t\t\t\t\t%f' % np.mean(self.models[-1].model_evals_pred))
-        print('BMFMC std:\t\t\t\t\t\t%f' % np.std(self.models[-1].model_evals_pred))
+        print('High-fidelity mean:\t\t\t\t%f' % np.mean(self.models[-1].model_evals_pred))
+        print('High-fidelity std:\t\t\t\t%f' % np.std(self.models[-1].model_evals_pred))
+        print('')
+        for i in range(self.n_models-2):
+            print('Mid-%d-fidelity mean:\t\t\t%f' % (int(i+1), np.mean(self.models[i+1].model_evals_pred)))
+            print('Mid-%d-fidelity std:\t\t\t\t%f' % (int(i+1), np.std(self.models[i+1].model_evals_pred)))
+        print('')
         print('Low-fidelity mean:\t\t\t\t%f' % np.mean(self.models[0].model_evals_pred))
         print('Low-fidelity std:\t\t\t\t%f' % np.std(self.models[0].model_evals_pred))
-        print('BMFMC-MC KL:\t\t\t\t\t%f' % np.mean(
-            np.log(self.models[-1].distribution.kernel_density(np.squeeze(self.models[-1].model_evals_pred)) /
-                   self.mc_model.distribution.kernel_density(np.squeeze(self.mc_model.model_evals_pred)))))
-        print('\n########################################')
+        print('')
+        print('########################################')
         print('')
 
-    def plot_results(self):
+    def plot_results(self, mc=False):
 
         # Determine bounds
         xmin = np.min([np.min(self.models[-1].model_evals_pred), np.min(self.models[0].model_evals_pred)])
@@ -173,6 +195,13 @@ class BMFMC:
             color = 'C' + str(i)
             self.models[i].distribution.plot_kde(fignum=self.fignum, color=color, xmin=xmin, xmax=xmax,
                                                   title='BMFMC - approximate distributions')
+
+        if mc and self.mc_model != 0:
+            self.mc_model.distribution.plot_kde(fignum=self.fignum, color='k', linestyle='--',
+                                                xmin=xmin, xmax=xmax, title='BMFMC - approximate distributions')
+        elif mc and self.mc_model == 0:
+            print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
+            exit()
 
         plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
         self.fignum += 1
@@ -194,7 +223,7 @@ class BMFMC:
             self.models[i].distribution.plot_kde(fignum=self.fignum, color=color, xmin=xmin, xmax=xmax,
                                                   title='BMFMC - approximate distributions')
 
-        self.mc_model.distribution.plot_kde(fignum=self.fignum, color='C' + str(self.n_models), linestyle='--',
+        self.mc_model.distribution.plot_kde(fignum=self.fignum, color='k', linestyle='--',
                                             xmin=xmin, xmax=xmax, title='BMFMC - approximate distributions')
 
         plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
