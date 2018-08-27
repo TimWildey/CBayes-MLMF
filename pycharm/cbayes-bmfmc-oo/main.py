@@ -28,9 +28,9 @@ pf_method = 'bmfmc'
 # Number of model evaluations in increasing fidelity (the lowest-fidelity model will always have n_samples evals)
 # Only lambda_p and ode_pp support more than one (i.e. arbitrary many) low-fidelity level
 # The number of models will thus be len(n_evals) + 1
-n_evals = [500, 100, 20]
-# n_evals = [100, 10]
-# n_evals = [10]
+# n_evals = [500, 100, 20]
+n_evals = [100, 10]
+# n_evals = [50]
 
 # Training set selection strategy (support_covering, sampling)
 training_set_strategy = 'support_covering'
@@ -40,9 +40,10 @@ regression_type = 'gaussian_process'
 
 # ---------------------------------------------------------- Todos ---------- #
 
-# todo: figure out why the KL between low- and high- model is equal to the sum of the KL between all intermediate ones
-# todo: compare high-fidelity with low-fidelity cbayes solutions
+# todo: implement distribution transformations to operate in unconstrained probability space only
+# todo: why is cbayes so robust wrt. the push-forward of the prior?
 # todo: implement adaptive training set selection procedure (requires some measure of information gain)
+# (uniform / LHS / sparse grids)
 # todo: add support for multiple QoIs (some parts are already there)
 # todo: implement other regression models
 
@@ -118,6 +119,7 @@ def get_prior_prior_pf_samples(n_samples):
 
             # Get prior push-forward samples
             prior_pf_samples = bmfmc.get_high_fidelity_samples()
+            prior_pf_lf_samples = bmfmc.get_low_fidelity_samples()
 
         else:
             print('Unknown push-forward method: %r' % pf_method)
@@ -187,6 +189,7 @@ def get_prior_prior_pf_samples(n_samples):
 
             # Get prior push-forward samples
             prior_pf_samples = bmfmc.get_high_fidelity_samples()
+            prior_pf_lf_samples = bmfmc.get_low_fidelity_samples()
 
         else:
             print('Unknown push-forward method: %r' % pf_method)
@@ -273,6 +276,7 @@ def get_prior_prior_pf_samples(n_samples):
 
             # Get prior push-forward samples
             prior_pf_samples = bmfmc.get_high_fidelity_samples()
+            prior_pf_lf_samples = bmfmc.get_low_fidelity_samples()
 
         else:
             print('Unknown push-forward method: %r' % pf_method)
@@ -282,7 +286,7 @@ def get_prior_prior_pf_samples(n_samples):
         print('Unknown model: %r' % model)
         exit()
 
-    return prior_samples, prior_pf_samples, obs_loc, obs_scale
+    return prior_samples, prior_pf_samples, obs_loc, obs_scale, prior_pf_lf_samples
 
 
 # --------------------------------------------------------------------------- #
@@ -295,7 +299,7 @@ if __name__ == '__main__':
     # Get samples from the prior, its push-forward and the observed density
     print('')
     print('Calculating the Prior push-forward ...')
-    prior_samples, prior_pf_samples, obs_loc, obs_scale = get_prior_prior_pf_samples(n_samples)
+    prior_samples, prior_pf_samples, obs_loc, obs_scale, prior_pf_lf_samples = get_prior_prior_pf_samples(n_samples)
 
     # Prior
     p_prior = Distribution(prior_samples, rv_name='$\lambda$', label='Prior', kde=False)
@@ -311,12 +315,24 @@ if __name__ == '__main__':
     # Posterior
     print('Evaluating the posterior ...')
     cbayes_post = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf)
-    p_post, p_post_pf = cbayes_post.setup_posterior_and_pf()
+    cbayes_post.setup_posterior_and_pf()
 
     # Output
     cbayes_post.print_stats()
 
     # Plot
     cbayes_post.plot_results(1)
+
+    # Low-fidelity comparison
+    if pf_method == 'bmfmc':
+        p_prior_pf_lf = Distribution(prior_pf_lf_samples, rv_name='$Q$', label='Prior-PF-LF')
+        obs_samples = np.random.randn(n_samples) * obs_scale + obs_loc
+        obs_samples = np.reshape(obs_samples, (n_samples, 1))
+        p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
+        cbayes_post_lf = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_lf)
+        cbayes_post_lf.setup_posterior_and_pf()
+        print('Evaluating a low-fidelity posterior ...')
+        cbayes_post_lf.print_stats()
+        cbayes_post_lf.plot_results(2)
 
 # --------------------------------------------------------------------------- #

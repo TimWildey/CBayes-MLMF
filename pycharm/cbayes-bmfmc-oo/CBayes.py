@@ -54,7 +54,9 @@ class CBayesPosterior:
         self.r = r
         self.acc_rate = idx.size / r.shape[0]
 
-        return self.p_prior.samples[idx], self.p_obs.samples[idx]
+        self.p_obs.samples = self.p_obs.samples[idx]
+
+        return self.p_prior.samples[idx], self.p_obs.samples
 
     # Create the posterior and its push-forward
     def setup_posterior_and_pf(self):
@@ -72,8 +74,6 @@ class CBayesPosterior:
                                       rv_transform=self.p_obs.rv_transform,
                                       label='Posterior-PF')
 
-        return self.p_post, self.p_post_pf
-
     # Print a bunch of output diagnostics
     def print_stats(self):
 
@@ -82,7 +82,7 @@ class CBayesPosterior:
         print('')
 
         # The rejection sampling acceptance rate
-        print('Acceptance rate:\t\t\t\t%f' % self.acc_rate )
+        print('Acceptance rate:\t\t\t\t%f' % self.acc_rate)
 
         # The posterior push-forward mean and std
         # (these should match the observed density)
@@ -91,8 +91,7 @@ class CBayesPosterior:
 
         # The KL between the push-forward of the posterior and the observed density
         # (this should be very close to zero)
-        print('Posterior-PF-Obs KL:\t\t\t%f' % np.mean(np.log(self.p_obs.kernel_density(np.squeeze(self.p_obs.samples)) /
-                                                self.p_post_pf.kernel_density(np.squeeze(self.p_obs.samples)))))
+        print('Posterior-PF-Obs KL:\t\t\t%f' % self.p_obs.calculate_kl_divergence(self.p_post_pf))
 
         # The posterior integral
         # (this should be very close to 1.0)
@@ -100,6 +99,8 @@ class CBayesPosterior:
 
         # The KL between posterior and prior (i.e. how informative is the data?)
         # (add a very small number to avoid taking log(0))
+        # This is done via r, because doing KDE for the prior / posterior densities can be hard when the number of
+        # random variables is large.
         print('Posterior-Prior KL:\t\t\t\t%f' % np.mean(self.r * np.log(self.r + 1e-10)))
 
         print('')
@@ -119,4 +120,7 @@ class CBayesPosterior:
         self.p_post_pf.plot_kde(fignum=fignum, color='C2', linestyle='--', xmin=xmin, xmax=xmax,
                                 title='CBayes')
 
-        plt.gcf().savefig('pngout/cbayes_dists.png', dpi=300)
+        if fignum == 2:
+            plt.gcf().savefig('pngout/cbayes_dists_lf.png', dpi=300)
+        else:
+            plt.gcf().savefig('pngout/cbayes_dists.png', dpi=300)

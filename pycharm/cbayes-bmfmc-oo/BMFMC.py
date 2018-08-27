@@ -29,10 +29,10 @@ class BMFMC:
 
     def apply_bmfmc_framework(self):
 
-        for i in range(self.n_models-1):
+        for i in range(self.n_models - 1):
 
             lf_model = self.models[i]
-            hf_model = self.models[i+1]
+            hf_model = self.models[i + 1]
 
             # 1) Evaluate the lowest-fidelity model
             if i == 0:
@@ -105,6 +105,17 @@ class BMFMC:
             hf_rv_samples = lf_model.rv_samples_pred[indices, :]
             hf_model.set_rv_samples(hf_rv_samples)
 
+        elif self.training_set_strategy == 'adaptive':
+
+            print('Not implemented yet')
+            exit()
+
+            # 1) Figure out where the model has already been evaluated (model.rv_samples)
+            # 2) Figure out how many more evaluations are desired
+            # 3) Add new evaluations points according to 'support_covering' strategy (append to model.rv_samples)
+            # 4) Evaluate the model at these points (append to model.model_evals)
+            # 5) Check the KL between old and updated model
+
         else:
             print('Unknown training set selection strategy.')
             exit()
@@ -145,6 +156,10 @@ class BMFMC:
 
         return self.models[-1].model_evals_pred
 
+    def get_low_fidelity_samples(self):
+
+        return self.models[0].model_evals_pred
+
     def calculate_mc_reference(self):
 
         self.mc_model = Model(eval_fun=self.models[-1].eval_fun, n_evals=self.models[0].n_evals,
@@ -161,42 +176,33 @@ class BMFMC:
         print('########### BMFMC statistics ###########')
         print('')
         if mc and self.mc_model != 0:
-            print('MC mean:\t\t\t\t\t\t%f' % np.mean(self.mc_model.model_evals_pred))
-            print('MC std:\t\t\t\t\t\t\t%f' % np.std(self.mc_model.model_evals_pred))
+            print('MC mean:\t\t\t\t\t\t%f' % self.mc_model.distribution.mean())
+            print('MC std:\t\t\t\t\t\t\t%f' % self.mc_model.distribution.std())
             print('')
-            print('MC-BMFMC KL:\t\t\t\t\t%f' % np.mean(
-                np.log(self.models[-1].distribution.kernel_density(np.squeeze(self.models[-1].model_evals_pred)) /
-                       self.mc_model.distribution.kernel_density(np.squeeze(self.mc_model.model_evals_pred)))))
+            print('MC-BMFMC KL:\t\t\t\t\t%f' % self.mc_model.distribution.calculate_kl_divergence(
+                self.models[-1].distribution))
         elif mc and self.mc_model == 0:
             print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
             exit()
         print('')
-        print('Low-fidelity mean:\t\t\t\t%f' % np.mean(self.models[0].model_evals_pred))
-        print('Low-fidelity std:\t\t\t\t%f' % np.std(self.models[0].model_evals_pred))
+        print('Low-fidelity mean:\t\t\t\t%f' % self.models[0].distribution.mean())
+        print('Low-fidelity std:\t\t\t\t%f' % self.models[0].distribution.std())
         print('')
-        kl_sum = 0.0
-        for i in range(self.n_models-2):
-            print('Mid-%d-fidelity mean:\t\t\t%f' % (int(i+1), np.mean(self.models[i+1].model_evals_pred)))
-            print('Mid-%d-fidelity std:\t\t\t\t%f' % (int(i+1), np.std(self.models[i+1].model_evals_pred)))
+        for i in range(self.n_models - 2):
+            print('Mid-%d-fidelity mean:\t\t\t%f' % (int(i + 1), self.models[i + 1].distribution.mean()))
+            print('Mid-%d-fidelity std:\t\t\t\t%f' % (int(i + 1), self.models[i + 1].distribution.std()))
             print('')
-            kl = np.mean(
-                np.log(self.models[i].distribution.kernel_density(np.squeeze(self.models[i].model_evals_pred)) /
-                       self.models[i + 1].distribution.kernel_density(np.squeeze(self.models[i + 1].model_evals_pred))))
+            kl = self.models[i].distribution.calculate_kl_divergence(self.models[i + 1].distribution)
             print('Relative information gain:\t\t%f' % kl)
             print('')
-            kl_sum += kl
-        print('High-fidelity mean:\t\t\t\t%f' % np.mean(self.models[-1].model_evals_pred))
-        print('High-fidelity std:\t\t\t\t%f' % np.std(self.models[-1].model_evals_pred))
+        print('High-fidelity mean:\t\t\t\t%f' % self.models[-1].distribution.mean())
+        print('High-fidelity std:\t\t\t\t%f' % self.models[-1].distribution.std())
         print('')
-        kl = np.mean(
-            np.log(self.models[-2].distribution.kernel_density(np.squeeze(self.models[-2].model_evals_pred)) /
-                   self.models[-1].distribution.kernel_density(np.squeeze(self.models[-1].model_evals_pred))))
-        kl_sum += kl
+        kl = self.models[-2].distribution.calculate_kl_divergence(self.models[-1].distribution)
         print('Relative information gain:\t\t%f' % kl)
-        print('Total information gain (calc):\t%f' % np.mean(
-            np.log(self.models[0].distribution.kernel_density(np.squeeze(self.models[0].model_evals_pred)) /
-                   self.models[-1].distribution.kernel_density(np.squeeze(self.models[-1].model_evals_pred)))))
-        print('Total information gain (sum):\t%f' % kl_sum)
+        print('')
+        print('Total information gain:\t\t\t%f' % self.models[0].distribution.calculate_kl_divergence(
+            self.models[-1].distribution))
         print('')
         print('########################################')
         print('')
@@ -208,11 +214,10 @@ class BMFMC:
         xmax = np.max([np.max(self.models[-1].model_evals_pred), np.max(self.models[0].model_evals_pred)])
 
         for i in range(self.n_models):
-
             # Plot
             color = 'C' + str(i)
             self.models[i].distribution.plot_kde(fignum=self.fignum, color=color, xmin=xmin, xmax=xmax,
-                                                  title='BMFMC - approximate distributions')
+                                                 title='BMFMC - approximate distributions')
 
         if mc and self.mc_model != 0:
             self.mc_model.distribution.plot_kde(fignum=self.fignum, color='k', linestyle='--',
@@ -235,11 +240,10 @@ class BMFMC:
         xmax = np.max([np.max(self.mc_model.model_evals_pred), np.max(self.models[0].model_evals_pred)])
 
         for i in range(self.n_models):
-
             # Plot
             color = 'C' + str(i)
             self.models[i].distribution.plot_kde(fignum=self.fignum, color=color, xmin=xmin, xmax=xmax,
-                                                  title='BMFMC - approximate distributions')
+                                                 title='BMFMC - approximate distributions')
 
         self.mc_model.distribution.plot_kde(fignum=self.fignum, color='k', linestyle='--',
                                             xmin=xmin, xmax=xmax, title='BMFMC - approximate distributions')
@@ -249,10 +253,9 @@ class BMFMC:
 
     def plot_regression_models(self):
 
-        for i in range(self.n_models-1):
-
+        for i in range(self.n_models - 1):
             lf_model = self.models[i]
-            hf_model = self.models[i+1]
+            hf_model = self.models[i + 1]
 
             regression_model = self.regression_models[i]
 
@@ -272,15 +275,14 @@ class BMFMC:
                                label='Training', title='BMFMC - regression model', xlabel=lf_model.rv_name,
                                ylabel=hf_model.rv_name)
 
-            plt.gcf().savefig('pngout/bmfmc_regression_model_' + str(i+1) + '.png', dpi=300)
+            plt.gcf().savefig('pngout/bmfmc_regression_model_' + str(i + 1) + '.png', dpi=300)
             self.fignum += 1
 
     def plot_joint_densities(self):
 
-        for i in range(self.n_models-1):
-
+        for i in range(self.n_models - 1):
             lf_model = self.models[i]
-            hf_model = self.models[i+1]
+            hf_model = self.models[i + 1]
 
             utils.plot_2d_contour(samples_x=np.squeeze(lf_model.model_evals_pred),
                                   samples_y=np.squeeze(hf_model.model_evals_pred),
@@ -289,5 +291,5 @@ class BMFMC:
                                   xlabel=lf_model.rv_name,
                                   ylabel=hf_model.rv_name)
 
-            plt.gcf().savefig('pngout/bmfmc_joint_dist_' + str(i+1) + '.png', dpi=300)
+            plt.gcf().savefig('pngout/bmfmc_joint_dist_' + str(i + 1) + '.png', dpi=300)
             self.fignum += 1
