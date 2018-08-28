@@ -50,28 +50,28 @@ class Distribution:
     def std(self):
         return np.std(self.samples, 0)
 
-    # Estimate the KL divergence between q and p
-    # (KL [q : p] = \int ( \log(q(x)) - \log(p(x)) ) q(x) dx)
-    def calculate_kl_divergence(self, p):
-        q0 = self.kernel_density(np.squeeze(self.samples))
-        q1 = p.kernel_density(np.squeeze(p.samples))
-        r = np.divide(q0, q1)
-        kl = np.mean(np.multiply(r, np.log(r)))
-        return kl
-
     # # Estimate the KL divergence between q and p
     # # (KL [q : p] = \int ( \log(q(x)) - \log(p(x)) ) q(x) dx)
     # def calculate_kl_divergence(self, p):
-    #     n_samples = self.n_samples
-    #     x_min = min([np.min(self.samples), np.min(p.samples)])
-    #     x_max = max([np.max(self.samples), np.max(p.samples)])
-    #     x = np.linspace(x_min, x_max, n_samples)
-    #     y1 = self.kernel_density(np.squeeze(x))
-    #     y2 = p.kernel_density(np.squeeze(x))
-    #     r = np.divide(y1, y2)
-    #     kl_arg = np.multiply(y1, np.log(r))
-    #     kl = trapz(kl_arg, x)
+    #     q0 = self.kernel_density(np.squeeze(self.samples))
+    #     q1 = p.kernel_density(np.squeeze(p.samples))
+    #     r = np.divide(q0, q1)
+    #     kl = np.mean(np.multiply(r, np.log(r)))
     #     return kl
+
+    # Estimate the KL divergence between q and p
+    # (KL [q : p] = \int ( \log(q(x)) - \log(p(x)) ) q(x) dx)
+    def calculate_kl_divergence(self, p):
+        n_samples = self.n_samples
+        x_min = min([np.min(self.samples), np.min(p.samples)])
+        x_max = max([np.max(self.samples), np.max(p.samples)])
+        x = np.linspace(x_min, x_max, n_samples)
+        y1 = self.kernel_density(np.squeeze(x))
+        y2 = p.kernel_density(np.squeeze(x))
+        r = np.divide(y1, y2)
+        kl_arg = np.multiply(y1, np.log(r))
+        kl = trapz(kl_arg, x)
+        return kl
 
     # Plot the KDE density
     def plot_kde(self, fignum, color='C0', linestyle='-', xmin=0.0, xmax=1.0, title=''):

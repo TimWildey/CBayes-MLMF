@@ -18,7 +18,7 @@ from CBayes import CBayesPosterior
 n_samples = int(1e4)
 
 # Forward model (lambda_p, ellptic_pde, ode_pp)
-model = 'ode_pp'
+model = 'elliptic_pde'
 
 # Push-forward method (mc, bmfmc)
 pf_method = 'bmfmc'
@@ -29,27 +29,40 @@ pf_method = 'bmfmc'
 # Only lambda_p and ode_pp support more than one (i.e. arbitrary many) low-fidelity level
 # The number of models will thus be len(n_evals) + 1
 # n_evals = [500, 100, 20]
-n_evals = [100, 10]
-# n_evals = [50]
+# n_evals = [100, 10]
+n_evals = [10]
 
-# Training set selection strategy (support_covering, sampling)
-training_set_strategy = 'support_covering'
+# Training set selection strategy (support_covering, sampling, sampling_adaptive)
+training_set_strategy = 'sampling_adaptive'
 
 # Regression model type (gaussian_process)
 regression_type = 'gaussian_process'
 
 # ---------------------------------------------------------- Todos ---------- #
 
+# Adaptive training
+# todo: check why alternative KL calculation fails
+# todo: create unique training sets
+# todo: implement support_covering_adaptive
+# todo: different options where to choose samples
+# todo: uniform / LHS / sparse grids
+
+# Distributions
+# todo: store KDE evaluations for distributions in a vector for reuse
 # todo: implement distribution transformations to operate in unconstrained probability space only
+
+# CBayes
 # todo: why is cbayes so robust wrt. the push-forward of the prior?
-# todo: implement adaptive training set selection procedure (requires some measure of information gain)
-# (uniform / LHS / sparse grids)
 # todo: add support for multiple QoIs (some parts are already there)
+
+# BMFMC
+# todo: check how to deal with the case where one has fixed evaluation points
 # todo: implement other regression models
 
 # ------------------------------------------------- Models & Methods -------- #
 
 def get_prior_prior_pf_samples(n_samples):
+
     prior_samples = prior_pf_samples = []
 
     if model == 'lambda_p':

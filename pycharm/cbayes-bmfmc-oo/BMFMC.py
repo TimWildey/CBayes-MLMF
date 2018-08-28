@@ -26,6 +26,8 @@ class BMFMC:
         self.regression_type = regression_type
         self.regression_models = []
         self.fignum = 10
+        self.adaptive = True
+        self.adaptive_tol = 5.0e-3
 
     def apply_bmfmc_framework(self):
 
@@ -33,6 +35,16 @@ class BMFMC:
 
             lf_model = self.models[i]
             hf_model = self.models[i + 1]
+            self.adaptive = True
+
+            if self.n_models == 2:
+                print('')
+                print('Training the conditional model ...')
+                print('')
+            else:
+                print('')
+                print('Creating conditional model %d / %d ...' % (i + 1, self.n_models - 1))
+                print('')
 
             # 1) Evaluate the lowest-fidelity model
             if i == 0:
@@ -40,19 +52,53 @@ class BMFMC:
                 lf_model.set_model_evals_pred(lf_model.model_evals)
                 lf_model.create_distribution()
 
-            # 2) Select lower-fidelity model evaluation points and evaluate the next higher-fidelity model
-            x_train = self.create_training_set(lf_model=lf_model, hf_model=hf_model, id=i)
-            y_train = hf_model.evaluate()
+            # Add samples adaptively until convergence
+            previous_dist = lf_model.distribution
+            x_train = []
+            adaptive_run = 0
+            while self.adaptive:
+                adaptive_run += 1
 
-            # 3) Fit a regression model to approximate p(q_l|q_l-1), predict q_l|q_l-1 at all low-fidelity samples,
-            #    generate low-fidelity samples from the predictions and create a distribution
-            hf_model_evals_pred = self.build_regression_predict_and_sample(x_train=x_train, y_train=y_train,
-                                                                           x_pred=lf_model.model_evals_pred)
-            hf_model.set_rv_samples_pred(lf_model.rv_samples_pred)
-            hf_model.set_model_evals_pred(hf_model_evals_pred.reshape((self.models[0].n_evals, hf_model.n_qoi)))
-            hf_model.create_distribution()
+                # 2) Select lower-fidelity model evaluation points and evaluate the next higher-fidelity model
+                if len(x_train) == 0:
+                    x_train = self.create_training_set(lf_model=lf_model, hf_model=hf_model, id=i)
+                else:
+                    x_train = np.append(x_train, self.create_training_set(lf_model=lf_model, hf_model=hf_model, id=i),
+                                        axis=0)
+                y_train = hf_model.evaluate()
+
+                # 3) Fit a regression model to approximate p(q_l|q_l-1), predict q_l|q_l-1 at all low-fidelity samples,
+                #    generate low-fidelity samples from the predictions and create a distribution
+                hf_model_evals_pred = self.build_regression_predict_and_sample(x_train=x_train, y_train=y_train,
+                                                                               x_pred=lf_model.model_evals_pred,
+                                                                               id=i)
+                hf_model.set_rv_samples_pred(lf_model.rv_samples_pred)
+                hf_model.set_model_evals_pred(hf_model_evals_pred.reshape((self.models[0].n_evals, hf_model.n_qoi)))
+                hf_model.create_distribution()
+
+                # 4) Check convergence
+                self.check_adaptive_convergence(this_dist=hf_model.distribution, previous_dist=previous_dist,
+                                                adaptive_run=adaptive_run)
+                previous_dist = hf_model.distribution
 
         return self.models[-1].model_evals_pred
+
+    def check_adaptive_convergence(self, this_dist, previous_dist, adaptive_run):
+
+        kl = this_dist.calculate_kl_divergence(previous_dist)
+
+        if kl < -1e-2:
+            print('Negative KL: %f' % kl)
+            exit()
+        else:
+            print('Adaptive run %d, KL: %f' % (adaptive_run, kl))
+
+        if kl <= self.adaptive_tol:
+            self.adaptive = False
+            print('Converged!')
+        elif adaptive_run >= 20:
+            print('No convergence after 20 runs... aborting.')
+            exit()
 
     def create_training_set(self, lf_model, hf_model, id):
 
@@ -84,7 +130,11 @@ class BMFMC:
             # Assign model evaluation points to the high-fidelity model
             hf_model.set_rv_samples(hf_rv_samples)
 
-        elif self.training_set_strategy == 'sampling':
+            if self.training_set_strategy == 'support_covering':
+                # No adaptivity
+                self.adaptive = False
+
+        elif self.training_set_strategy == 'sampling' or self.training_set_strategy == 'sampling_adaptive':
 
             # Get some random variable samples
             indices = np.random.choice(range(lf_model.rv_samples_pred.shape[0]), size=hf_model.n_evals, replace=False)
@@ -105,16 +155,9 @@ class BMFMC:
             hf_rv_samples = lf_model.rv_samples_pred[indices, :]
             hf_model.set_rv_samples(hf_rv_samples)
 
-        elif self.training_set_strategy == 'adaptive':
-
-            print('Not implemented yet')
-            exit()
-
-            # 1) Figure out where the model has already been evaluated (model.rv_samples)
-            # 2) Figure out how many more evaluations are desired
-            # 3) Add new evaluations points according to 'support_covering' strategy (append to model.rv_samples)
-            # 4) Evaluate the model at these points (append to model.model_evals)
-            # 5) Check the KL between old and updated model
+            if self.training_set_strategy == 'sampling':
+                # No adaptivity
+                self.adaptive = False
 
         else:
             print('Unknown training set selection strategy.')
@@ -122,7 +165,7 @@ class BMFMC:
 
         return x_train
 
-    def build_regression_predict_and_sample(self, x_train, y_train, x_pred):
+    def build_regression_predict_and_sample(self, x_train, y_train, x_pred, id):
 
         hf_model_evals_pred = []
         regression_model = []
@@ -148,7 +191,13 @@ class BMFMC:
             exit()
 
         # Save regression model
-        self.regression_models.append(regression_model)
+        if len(self.regression_models) == id:
+            self.regression_models.append(regression_model)
+        elif len(self.regression_models) == id + 1:
+            self.regression_models[id] = regression_model
+        else:
+            print('This is not supposed to happen. Something went very wrong.')
+            exit()
 
         return hf_model_evals_pred
 
