@@ -91,7 +91,7 @@ class CBayesPosterior:
 
         # The KL between the push-forward of the posterior and the observed density
         # (this should be very close to zero)
-        print('Posterior-PF-Obs KL:\t\t\t%f' % self.p_obs.calculate_kl_divergence(self.p_post_pf))
+        print('Posterior-PF-Obs KL:\t\t\t%f' % self.p_post_pf.calculate_kl_divergence(self.p_obs))
 
         # The posterior integral
         # (this should be very close to 1.0)
@@ -123,4 +123,4 @@ class CBayesPosterior:
         if fignum == 2:
             plt.gcf().savefig('pngout/cbayes_dists_lf.png', dpi=300)
         else:
-            plt.gcf().savefig('pngout/cbayes_dists.png', dpi=300)
+            plt.gcf().savefig('pngout/cbayes_dists_hf.png', dpi=300)

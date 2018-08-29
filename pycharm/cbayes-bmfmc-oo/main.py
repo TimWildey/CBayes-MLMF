@@ -1,5 +1,6 @@
 # Standard stuff
 import numpy as np
+import os
 
 # Model stuff
 import lambda_p
@@ -18,7 +19,7 @@ from CBayes import CBayesPosterior
 n_samples = int(1e4)
 
 # Forward model (lambda_p, ellptic_pde, ode_pp)
-model = 'elliptic_pde'
+model = 'ode_pp'
 
 # Push-forward method (mc, bmfmc)
 pf_method = 'bmfmc'
@@ -30,7 +31,7 @@ pf_method = 'bmfmc'
 # The number of models will thus be len(n_evals) + 1
 # n_evals = [500, 100, 20]
 # n_evals = [100, 10]
-n_evals = [10]
+n_evals = [50, 20, 10]
 
 # Training set selection strategy (support_covering, sampling, sampling_adaptive)
 training_set_strategy = 'sampling_adaptive'
@@ -41,7 +42,6 @@ regression_type = 'gaussian_process'
 # ---------------------------------------------------------- Todos ---------- #
 
 # Adaptive training
-# todo: check why alternative KL calculation fails
 # todo: create unique training sets
 # todo: implement support_covering_adaptive
 # todo: different options where to choose samples
@@ -308,6 +308,12 @@ def get_prior_prior_pf_samples(n_samples):
 # ------------------------------------------------------------- Main -------- #
 
 if __name__ == '__main__':
+
+    # Clean pngout folder
+    if os.path.isdir('pngout'):
+        os.system('rm pngout/*')
+    else:
+        os.mkdir('pngout')
 
     # Get samples from the prior, its push-forward and the observed density
     print('')

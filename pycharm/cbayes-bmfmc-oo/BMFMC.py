@@ -324,7 +324,10 @@ class BMFMC:
                                label='Training', title='BMFMC - regression model', xlabel=lf_model.rv_name,
                                ylabel=hf_model.rv_name)
 
-            plt.gcf().savefig('pngout/bmfmc_regression_model_' + str(i + 1) + '.png', dpi=300)
+            if self.n_models > 2:
+                plt.gcf().savefig('pngout/bmfmc_regression_model_' + str(i + 1) + '.png', dpi=300)
+            else:
+                plt.gcf().savefig('pngout/bmfmc_regression_model.png', dpi=300)
             self.fignum += 1
 
     def plot_joint_densities(self):
@@ -340,5 +343,8 @@ class BMFMC:
                                   xlabel=lf_model.rv_name,
                                   ylabel=hf_model.rv_name)
 
-            plt.gcf().savefig('pngout/bmfmc_joint_dist_' + str(i + 1) + '.png', dpi=300)
+            if self.n_models > 2:
+                plt.gcf().savefig('pngout/bmfmc_joint_dist_' + str(i + 1) + '.png', dpi=300)
+            else:
+                plt.gcf().savefig('pngout/bmfmc_joint_dist.png', dpi=300)
             self.fignum += 1
