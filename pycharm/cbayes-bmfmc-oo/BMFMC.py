@@ -27,7 +27,7 @@ class BMFMC:
         self.regression_models = []
         self.fignum = 10
         self.adaptive = True
-        self.adaptive_tol = 5.0e-3
+        self.adaptive_tol = 2.0e-3
 
     def apply_bmfmc_framework(self):
 
@@ -40,11 +40,9 @@ class BMFMC:
             if self.n_models == 2:
                 print('')
                 print('Training the conditional model ...')
-                print('')
             else:
                 print('')
                 print('Creating conditional model %d / %d ...' % (i + 1, self.n_models - 1))
-                print('')
 
             # 1) Evaluate the lowest-fidelity model
             if i == 0:
@@ -56,6 +54,7 @@ class BMFMC:
             previous_dist = lf_model.distribution
             x_train = []
             adaptive_run = 0
+
             while self.adaptive:
                 adaptive_run += 1
 
@@ -77,9 +76,10 @@ class BMFMC:
                 hf_model.create_distribution()
 
                 # 4) Check convergence
-                self.check_adaptive_convergence(this_dist=hf_model.distribution, previous_dist=previous_dist,
-                                                adaptive_run=adaptive_run)
-                previous_dist = hf_model.distribution
+                if self.adaptive:
+                    self.check_adaptive_convergence(this_dist=hf_model.distribution, previous_dist=previous_dist,
+                                                    adaptive_run=adaptive_run)
+                    previous_dist = hf_model.distribution
 
         return self.models[-1].model_evals_pred
 
@@ -88,9 +88,11 @@ class BMFMC:
         kl = this_dist.calculate_kl_divergence(previous_dist)
 
         if kl < -1e-2:
+            print('')
             print('Negative KL: %f' % kl)
             exit()
         else:
+            print('')
             print('Adaptive run %d, KL: %f' % (adaptive_run, kl))
 
         if kl <= self.adaptive_tol:
@@ -104,26 +106,37 @@ class BMFMC:
 
         x_train = []
 
-        if self.training_set_strategy == 'support_covering':
+        if self.training_set_strategy == 'support_covering' or self.training_set_strategy == 'support_covering_adaptive':
 
-            # Create a uniform grid across the support of p(q)
-            x_train_linspace = np.linspace(lf_model.model_evals_pred.min(), lf_model.model_evals_pred.max(),
-                                           num=hf_model.n_evals)
+            if len(self.regression_models) == id:
+                # Create a uniform grid across the support of p(q)
+                x_train_linspace = np.linspace(lf_model.model_evals_pred.min(), lf_model.model_evals_pred.max(),
+                                               num=hf_model.n_evals)
+                x_train_linspace = np.reshape(x_train_linspace, (hf_model.n_evals, hf_model.n_qoi))
+            else:
+                diffs = np.diff(self.regression_models[id].X_train_, n=1, axis=0)
+                diffs = np.reshape(diffs, (np.shape(diffs)[0], hf_model.n_qoi))
+                x_train_linspace = self.regression_models[id].X_train_[:-1, :] + 0.5 * diffs
+
+            n_train = np.shape(x_train_linspace)[0]
 
             # Find the lower-fidelity samples closest to the grid points and get the corresponding lambdas
-            # Those are only available for the lowest-fidelity model and need to be computed for any other model
-            x_train = np.zeros((hf_model.n_evals, hf_model.n_qoi))
-            hf_rv_samples = np.zeros((hf_model.n_evals, lf_model.n_random))
-            for i in range(hf_model.n_evals):
-                idx = (np.abs(lf_model.model_evals_pred - x_train_linspace[i])).argmin()
+            x_train = np.zeros((n_train, hf_model.n_qoi))
+            hf_rv_samples = np.zeros((n_train, lf_model.n_random))
+            for i in range(n_train):
 
-                if id > 0:
-                    x_train[i] = lf_model.eval_fun(lf_model.rv_samples_pred[idx, :])
-                elif id == 0:
+                # This is only exact for the lowest fidelity regression model
+                if id == 0:
+                    idx = (np.abs(lf_model.model_evals_pred - x_train_linspace[i, :])).argmin()
                     x_train[i] = lf_model.model_evals_pred[idx]
+
+                # For any other regression model, finding the correct x,y pair is a noisy task.
+                # We use the mean predictions of the GP to do that.
                 else:
-                    print('Invalid model id. Something went very wrong.')
-                    exit()
+                    regression_model = self.regression_models[id-1]
+                    mu = regression_model.predict(self.models[id-1].model_evals_pred, return_std=False)
+                    idx = (np.abs(mu - x_train_linspace[i, :])).argmin()
+                    x_train[i] = lf_model.eval_fun(lf_model.rv_samples_pred[idx, :])
 
                 hf_rv_samples[i, :] = lf_model.rv_samples_pred[idx, :]
 
@@ -208,6 +221,24 @@ class BMFMC:
     def get_low_fidelity_samples(self):
 
         return self.models[0].model_evals_pred
+
+    def get_mc_samples(self):
+
+        if self.mc_model != 0:
+
+            return self.mc_model.model_evals_pred
+
+        else:
+            print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
+            exit()
+
+    def get_samples(self):
+
+        samples = np.zeros((self.n_models, self.models[0].n_samples, self.models[0].n_qoi))
+        for i in range(self.n_models):
+            samples[i, :, :] = self.models[i].model_evals_pred
+
+        return samples
 
     def calculate_mc_reference(self):
 

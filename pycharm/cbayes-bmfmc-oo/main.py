@@ -29,12 +29,11 @@ pf_method = 'bmfmc'
 # Number of model evaluations in increasing fidelity (the lowest-fidelity model will always have n_samples evals)
 # Only lambda_p and ode_pp support more than one (i.e. arbitrary many) low-fidelity level
 # The number of models will thus be len(n_evals) + 1
-# n_evals = [500, 100, 20]
-# n_evals = [100, 10]
 n_evals = [50, 20, 10]
+# n_evals = [10]
 
-# Training set selection strategy (support_covering, sampling, sampling_adaptive)
-training_set_strategy = 'sampling_adaptive'
+# Training set selection strategy (support_covering, support_covering_adaptive, sampling, sampling_adaptive)
+training_set_strategy = 'support_covering_adaptive'
 
 # Regression model type (gaussian_process)
 regression_type = 'gaussian_process'
@@ -43,7 +42,6 @@ regression_type = 'gaussian_process'
 
 # Adaptive training
 # todo: create unique training sets
-# todo: implement support_covering_adaptive
 # todo: different options where to choose samples
 # todo: uniform / LHS / sparse grids
 
@@ -63,7 +61,7 @@ regression_type = 'gaussian_process'
 
 def get_prior_prior_pf_samples(n_samples):
 
-    prior_samples = prior_pf_samples = []
+    prior_samples = prior_pf_samples = obs_loc = obs_scale = prior_pf_mc_samples = []
 
     if model == 'lambda_p':
 
@@ -131,8 +129,8 @@ def get_prior_prior_pf_samples(n_samples):
             bmfmc.plot_joint_densities()
 
             # Get prior push-forward samples
-            prior_pf_samples = bmfmc.get_high_fidelity_samples()
-            prior_pf_lf_samples = bmfmc.get_low_fidelity_samples()
+            prior_pf_samples = bmfmc.get_samples()
+            prior_pf_mc_samples = bmfmc.get_mc_samples()
 
         else:
             print('Unknown push-forward method: %r' % pf_method)
@@ -201,8 +199,8 @@ def get_prior_prior_pf_samples(n_samples):
             bmfmc.plot_joint_densities()
 
             # Get prior push-forward samples
-            prior_pf_samples = bmfmc.get_high_fidelity_samples()
-            prior_pf_lf_samples = bmfmc.get_low_fidelity_samples()
+            prior_pf_samples = bmfmc.get_samples()
+            prior_pf_mc_samples = bmfmc.get_mc_samples()
 
         else:
             print('Unknown push-forward method: %r' % pf_method)
@@ -236,7 +234,7 @@ def get_prior_prior_pf_samples(n_samples):
             # Create a low-fidelity model
             dt_lf = 1.0
             lf_settings = ode_pp.Settings(finalt=finalt, dt=dt_lf, u0=u0)
-            lf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, lf_settings)[0, -1], rv_samples=prior_samples,
+            lf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, lf_settings)[0, -1] + 1.0, rv_samples=prior_samples,
                              rv_samples_pred=prior_samples, n_evals=n_samples, n_qoi=n_qoi,
                              rv_name='$q_0$', label='Low-fidelity')
 
@@ -288,8 +286,8 @@ def get_prior_prior_pf_samples(n_samples):
             bmfmc.plot_joint_densities()
 
             # Get prior push-forward samples
-            prior_pf_samples = bmfmc.get_high_fidelity_samples()
-            prior_pf_lf_samples = bmfmc.get_low_fidelity_samples()
+            prior_pf_samples = bmfmc.get_samples()
+            prior_pf_mc_samples = bmfmc.get_mc_samples()
 
         else:
             print('Unknown push-forward method: %r' % pf_method)
@@ -299,7 +297,7 @@ def get_prior_prior_pf_samples(n_samples):
         print('Unknown model: %r' % model)
         exit()
 
-    return prior_samples, prior_pf_samples, obs_loc, obs_scale, prior_pf_lf_samples
+    return prior_samples, prior_pf_samples, obs_loc, obs_scale, prior_pf_mc_samples
 
 
 # --------------------------------------------------------------------------- #
@@ -318,13 +316,13 @@ if __name__ == '__main__':
     # Get samples from the prior, its push-forward and the observed density
     print('')
     print('Calculating the Prior push-forward ...')
-    prior_samples, prior_pf_samples, obs_loc, obs_scale, prior_pf_lf_samples = get_prior_prior_pf_samples(n_samples)
+    prior_samples, prior_pf_samples, obs_loc, obs_scale, prior_pf_mc_samples = get_prior_prior_pf_samples(n_samples)
 
     # Prior
     p_prior = Distribution(prior_samples, rv_name='$\lambda$', label='Prior', kde=False)
 
     # Prior push-forward
-    p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
+    p_prior_pf = Distribution(prior_pf_samples[-1, :, :], rv_name='$Q$', label='Prior-PF')
 
     # Observed density
     obs_samples = np.random.randn(n_samples) * obs_scale + obs_loc
@@ -342,16 +340,31 @@ if __name__ == '__main__':
     # Plot
     cbayes_post.plot_results(1)
 
-    # Low-fidelity comparison
+    # Low-fidelity comparisons
     if pf_method == 'bmfmc':
-        p_prior_pf_lf = Distribution(prior_pf_lf_samples, rv_name='$Q$', label='Prior-PF-LF')
+        for i in range(len(n_evals)):
+            print('Evaluating the low-fidelity posteriors %d / %d ...' % (i+1, len(n_evals)))
+            p_prior_pf_lf = Distribution(prior_pf_samples[i, :, :], rv_name='$Q$', label='Prior-PF-LF')
+            obs_samples = np.random.randn(n_samples) * obs_scale + obs_loc
+            obs_samples = np.reshape(obs_samples, (n_samples, 1))
+            p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
+            cbayes_post_lf = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_lf)
+            cbayes_post_lf.setup_posterior_and_pf()
+            cbayes_post_lf.print_stats()
+            if i == 0:
+                cbayes_post_lf.plot_results(2)
+
+    # Monte Carlo comparison
+    if pf_method == 'bmfmc':
+        p_prior_pf_mc = Distribution(prior_pf_mc_samples, rv_name='$Q$', label='Prior-PF-MC')
         obs_samples = np.random.randn(n_samples) * obs_scale + obs_loc
         obs_samples = np.reshape(obs_samples, (n_samples, 1))
         p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
-        cbayes_post_lf = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_lf)
-        cbayes_post_lf.setup_posterior_and_pf()
-        print('Evaluating a low-fidelity posterior ...')
-        cbayes_post_lf.print_stats()
-        cbayes_post_lf.plot_results(2)
+        cbayes_post_mc = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_mc)
+        cbayes_post_mc.setup_posterior_and_pf()
+        print('Evaluating the Monte Carlo posterior ...')
+        cbayes_post_mc.print_stats()
+        cbayes_post_mc.plot_results(3)
+
 
 # --------------------------------------------------------------------------- #

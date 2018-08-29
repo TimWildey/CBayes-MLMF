@@ -122,5 +122,7 @@ class CBayesPosterior:
 
         if fignum == 2:
             plt.gcf().savefig('pngout/cbayes_dists_lf.png', dpi=300)
+        elif fignum == 3:
+            plt.gcf().savefig('pngout/cbayes_dists_mc.png', dpi=300)
         else:
             plt.gcf().savefig('pngout/cbayes_dists_hf.png', dpi=300)

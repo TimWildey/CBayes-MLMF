@@ -67,9 +67,12 @@ class Model:
             self.n_samples = np.shape(rv_samples)[0]
             self.n_random = np.shape(rv_samples)[1]
 
-        # Else, update the vector with the given vector (there must not be any duplicates)
+        # Else, update the vector with the given vector
         else:
-            self.rv_samples = np.append(self.rv_samples, rv_samples, axis=0)
+            for row in rv_samples:
+                # if not np.equal(row, self.rv_samples).all(axis=1).any():
+                self.rv_samples = np.append(self.rv_samples, np.reshape(row, (1, self.n_random)), axis=0)
+
             self.n_samples = np.shape(self.rv_samples)[0]
 
     # Set the model evaluation points for prediction (those will be the same of any fidelity model)
