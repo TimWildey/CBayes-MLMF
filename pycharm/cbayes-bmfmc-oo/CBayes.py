@@ -39,8 +39,8 @@ class CBayesPosterior:
     def generate_posterior_samples(self):
 
         # Calculate the weights
-        r = np.divide(self.p_obs.kernel_density(np.squeeze(self.p_prior_pf.samples)),
-                      self.p_prior_pf.kernel_density(np.squeeze(self.p_prior_pf.samples)))
+        r = np.divide(self.p_obs.kernel_density(np.squeeze(self.p_prior_pf.samples)) + 1e-10,
+                      self.p_prior_pf.kernel_density(np.squeeze(self.p_prior_pf.samples)) + 1e-10)
 
         # Check against
         check = np.random.uniform(low=0, high=1, size=r.size)
@@ -74,6 +74,10 @@ class CBayesPosterior:
                                       rv_transform=self.p_obs.rv_transform,
                                       label='Posterior-PF')
 
+    # Get the KL between prior and posterior
+    def get_prior_post_kl(self):
+        return np.mean(self.r * np.log(self.r))
+
     # Print a bunch of output diagnostics
     def print_stats(self):
 
@@ -101,7 +105,7 @@ class CBayesPosterior:
         # (add a very small number to avoid taking log(0))
         # This is done via r, because doing KDE for the prior / posterior densities can be hard when the number of
         # random variables is large.
-        print('Posterior-Prior KL:\t\t\t\t%f' % np.mean(self.r * np.log(self.r + 1e-10)))
+        print('Posterior-Prior KL:\t\t\t\t%f' % np.mean(self.r * np.log(self.r)))
 
         print('')
         print('########################################')
