@@ -4,7 +4,7 @@ import numpy as np
 
 
 def lambda_p(lam, p):
-    return lam ** p + 0.01*np.random.randn(np.shape(lam)[0])
+    return lam ** p
 
 
 def get_prior_samples(n_samples):

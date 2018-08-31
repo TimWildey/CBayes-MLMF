@@ -23,7 +23,7 @@ from CBayes import CBayesPosterior
 n_samples = int(1e4)
 
 # Forward model (lambda_p, ellptic_pde, ode_pp)
-model = 'ode_pp'
+model = 'elliptic_pde'
 
 # Push-forward method (mc, bmfmc)
 pf_method = 'bmfmc'
@@ -35,11 +35,11 @@ pf_method = 'bmfmc'
 # Number of model evaluations in increasing fidelity (the lowest-fidelity model will always have n_samples evals)
 # Only lambda_p and ode_pp support more than one (i.e. arbitrary many) low-fidelity level
 # The number of models will thus be len(n_evals) + 1
-# n_evals = [200, 100, 50, 20, 10, 5]
-n_evals = [50, 20, 5]
+# n_evals = [200, 100, 50, 20, 10]
+n_evals = [100]
 
 # Training set selection strategy (support_covering, support_covering_adaptive, sampling, sampling_adaptive)
-training_set_strategy = 'support_covering_adaptive'
+training_set_strategy = 'support_covering'
 
 # Regression model type (gaussian_process, heteroscedastic_gaussian_process)
 regression_type = 'heteroscedastic_gaussian_process'
@@ -47,9 +47,6 @@ regression_type = 'heteroscedastic_gaussian_process'
 
 # ---------------------------------------------------------- Todos ---------- #
 
-
-# Validation
-# todo: (!!!) create convergence plots of the l1 error of the posterior over the number of high-fidelity evaluations
 
 # Framework
 # todo: (!!!) add support for multiple QoIs (some parts are already there)
@@ -158,6 +155,10 @@ def get_prior_prior_pf_samples(n_samples):
             prior_pf_mc_samples = prior_pf_samples
 
         elif pf_method == 'bmfmc':
+
+            if len(n_evals) > 1:
+                print('elliptic_pde only supports 2 levels of fidelity.')
+                exit()
 
             # Construct low-fi model
             X_train = lam[0:round(split * lam.shape[0])]
