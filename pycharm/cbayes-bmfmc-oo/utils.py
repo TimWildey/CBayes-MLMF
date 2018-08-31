@@ -3,6 +3,7 @@ from scipy.stats import gaussian_kde as gkde
 import numpy as np
 
 
+# Plot arbitrary 1D data i.e. vector x over vector y
 def plot_1d_data(x, y, marker='None', markersize=5, linestyle='-', linewidth=3, color='C0', label='', num=1,
                  xlabel='$x$', ylabel='$y$', title='', xlim=None, ylim=None):
     if len(str(num)) >= 3:
@@ -26,6 +27,7 @@ def plot_1d_data(x, y, marker='None', markersize=5, linestyle='-', linewidth=3, 
     plt.title(title)
 
 
+# Plot a 1D kernel density estimation
 def plot_1d_kde(qkde, xmin=0.0, xmax=1.0, linestyle='-', linewidth=3, color='C0', num=1,
                 xlabel='$x$', ylabel='$p(x)$', label='', title=''):
 
@@ -43,6 +45,7 @@ def plot_1d_kde(qkde, xmin=0.0, xmax=1.0, linestyle='-', linewidth=3, color='C0'
     plt.title(title)
 
 
+# Plot a 1D histogram given samples
 def plot_1d_hist(samples, num=1, title='', xlabel='$x$', ylabel='$p(x)$'):
 
     if len(str(num)) >= 3:
@@ -60,6 +63,7 @@ def plot_1d_hist(samples, num=1, title='', xlabel='$x$', ylabel='$p(x)$'):
     # plt.gcf().set_figwidth(6)
 
 
+# Plot a 1D regression model with 99% confidence intervals
 def plot_1d_conf(x_pred, y_pred, sigma, num=1, title=''):
 
     if len(str(num)) >= 3:
@@ -80,6 +84,7 @@ def plot_1d_conf(x_pred, y_pred, sigma, num=1, title=''):
     plt.title(title)
 
 
+# Scatter two sets of data samples x and y
 def plot_2d_scatter(samples_x, samples_y, marker='o', num=1, title='', xlim=None, ylim=None, xlabel="$x$", ylabel="$y$"):
 
     if len(str(num)) >= 3:
@@ -108,6 +113,7 @@ def plot_2d_scatter(samples_x, samples_y, marker='o', num=1, title='', xlim=None
     plt.title(title)
 
 
+# Create a 2D contour plot using KDE given two sets of samples x and y
 def plot_2d_contour(samples_x, samples_y, num=1, title='', xlim=None, ylim=None, xlabel="$x$", ylabel="$y$"):
 
     if len(str(num)) >= 3:

@@ -18,6 +18,7 @@ class Model:
     # - label: model label
     # - rv_name: QoI name
 
+    # Constructor
     def __init__(self, eval_fun, n_evals, n_qoi, rv_samples=None, rv_samples_pred=None, label='', rv_name=''):
 
         self.rv_samples = None

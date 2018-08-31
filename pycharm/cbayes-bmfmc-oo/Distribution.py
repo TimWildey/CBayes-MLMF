@@ -2,7 +2,6 @@ import numpy as np
 import utils
 import warnings
 from scipy.stats import gaussian_kde as gkde
-from scipy.integrate import trapz
 
 
 class Distribution:
@@ -11,6 +10,7 @@ class Distribution:
     # - rv_name: random variable name(s)
     # - label: distribution label
     # - kernel_density: the KDE density estimate
+    # - kde_evals: evaluations of the kernel density at the distribution samples
     # - samples: distribution samples that were used for the KDE with shape (n_samples, dist_dim)
     # - n_samples: number of samples
     # - n_dim: number of random variables
@@ -25,7 +25,7 @@ class Distribution:
         self.n_samples = np.shape(samples)[0]
         self.n_dim = np.shape(samples)[1]
         self.rv_transform = rv_transform
-        self.kde_eval = None
+        self.kde_evals = None
 
         if self.n_dim < 3 and kde:
             self.kernel_density = gkde(np.squeeze(samples))
@@ -57,38 +57,20 @@ class Distribution:
         if self.kernel_density is None:
             print('No kernel density available. Check your distribution.')
             exit()
-        if self.kde_eval is None:
-            self.kde_eval = self.kernel_density(np.squeeze(self.samples))
-        return self.kde_eval
+        if self.kde_evals is None:
+            self.kde_evals = self.kernel_density(np.squeeze(self.samples))
+        return self.kde_evals
 
     # Estimate the KL divergence between q and p
     # (KL [q : p] = \int ( \log(q(x)) - \log(p(x)) ) q(x) dx)
     def calculate_kl_divergence(self, p):
         q = self.eval_kernel_density()
-        # q = self.kernel_density(np.squeeze(self.samples))
         q += 1e-10
         p = p.kernel_density(np.squeeze(self.samples))
         p += 1e-10
         kl = np.mean(np.log(np.divide(q, p)))
-
         if kl < 0.0:
             warnings.warn('Warning: Negative KL: %f' % kl)
-
-        return kl
-
-    # Estimate the KL divergence between q and p
-    # (KL [q : p] = \int ( \log(q(x)) - \log(p(x)) ) q(x) dx)
-    def calculate_kl_divergence_alt(self, p):
-        n_samples = self.n_samples
-        x_min = min([np.min(self.samples), np.min(p.samples)])
-        x_max = max([np.max(self.samples), np.max(p.samples)])
-        x = np.linspace(x_min, x_max, n_samples)
-        y1 = self.kernel_density(np.squeeze(x))
-        y2 = p.kernel_density(np.squeeze(x))
-        y1 += 1e-10
-        y2 += 1e-10
-        kl_arg = np.multiply(y1, np.log(y1) - np.log(y2))
-        kl = trapz(kl_arg, x)
         return kl
 
     # Plot the KDE density

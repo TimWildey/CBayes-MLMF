@@ -17,6 +17,7 @@ class BMFMC:
     # - regression_model: regression model for the conditionals p(q_l|q_l-1)
     # - fignum: figure counter for plotting
 
+    # Constructor
     def __init__(self, models, training_set_strategy, regression_type):
 
         self.models = models
@@ -27,8 +28,9 @@ class BMFMC:
         self.regression_models = []
         self.fignum = 10
         self.adaptive = True
-        self.adaptive_tol = 1.0e-3
+        self.adaptive_tol = 2.0e-3
 
+    # Main method in bmfmc: evaluate, regress, predict
     def apply_bmfmc_framework(self):
 
         for i in range(self.n_models - 1):
@@ -83,6 +85,7 @@ class BMFMC:
 
         return self.models[-1].model_evals_pred
 
+    # Check for convergence in terms of the KL to the previous model with less samples
     def check_adaptive_convergence(self, this_dist, previous_dist, adaptive_run):
 
         kl = this_dist.calculate_kl_divergence(previous_dist)
@@ -97,6 +100,7 @@ class BMFMC:
             print('No convergence after 20 runs... aborting.')
             exit()
 
+    # Create the training set for the regression
     def create_training_set(self, lf_model, hf_model, id):
 
         x_train = []
@@ -175,10 +179,11 @@ class BMFMC:
 
         return x_train
 
+    # Create the regression model and make high-fidelity predictions
     def build_regression_predict_and_sample(self, x_train, y_train, x_pred, id):
 
-        hf_model_evals_pred = []
-        regression_model = []
+        hf_model_evals_pred = None
+        regression_model = None
 
         if self.regression_type == 'gaussian_process':
 
@@ -211,14 +216,17 @@ class BMFMC:
 
         return hf_model_evals_pred
 
+    # Obtain the predicted highest-fidelity samples
     def get_high_fidelity_samples(self):
 
         return self.models[-1].model_evals_pred
 
+    # Obtain the lowest-fidelity samples
     def get_low_fidelity_samples(self):
 
         return self.models[0].model_evals_pred
 
+    # Obtain the Monte Carlo reference samples
     def get_mc_samples(self):
 
         if self.mc_model is not None:
@@ -229,6 +237,7 @@ class BMFMC:
             print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
             exit()
 
+    # Obtain samples from all models (exluding the MC reference)
     def get_samples(self):
 
         samples = np.zeros((self.n_models, self.models[0].n_samples, self.models[0].n_qoi))
@@ -237,6 +246,7 @@ class BMFMC:
 
         return samples
 
+    # Calculate a Monte Carlo reference solution
     def calculate_mc_reference(self):
 
         self.mc_model = Model(eval_fun=self.models[-1].eval_fun, n_evals=self.models[0].n_evals,
@@ -247,6 +257,7 @@ class BMFMC:
         self.mc_model.set_model_evals_pred(self.mc_model.model_evals)
         self.mc_model.create_distribution()
 
+    # Print some stats
     def print_stats(self, mc=False):
 
         print('')
@@ -284,6 +295,7 @@ class BMFMC:
         print('########################################')
         print('')
 
+    # Plot BMFMC distributions
     def plot_results(self, mc=False):
 
         # Determine bounds
@@ -296,38 +308,17 @@ class BMFMC:
             self.models[i].distribution.plot_kde(fignum=self.fignum, color=color, xmin=xmin, xmax=xmax,
                                                  title='BMFMC - approximate distributions')
 
-        if mc and self.mc_model != 0:
+        if mc and self.mc_model is not None:
             self.mc_model.distribution.plot_kde(fignum=self.fignum, color='k', linestyle='--',
                                                 xmin=xmin, xmax=xmax, title='BMFMC - approximate distributions')
-        elif mc and self.mc_model == 0:
+        elif mc and self.mc_model is None:
             print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
             exit()
 
         plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
         self.fignum += 1
 
-    def plot_results_with_mc(self):
-
-        if self.mc_model == 0:
-            print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
-            exit()
-
-        # Determine bounds
-        xmin = np.min([np.min(self.mc_model.model_evals_pred), np.min(self.models[0].model_evals_pred)])
-        xmax = np.max([np.max(self.mc_model.model_evals_pred), np.max(self.models[0].model_evals_pred)])
-
-        for i in range(self.n_models):
-            # Plot
-            color = 'C' + str(i)
-            self.models[i].distribution.plot_kde(fignum=self.fignum, color=color, xmin=xmin, xmax=xmax,
-                                                 title='BMFMC - approximate distributions')
-
-        self.mc_model.distribution.plot_kde(fignum=self.fignum, color='k', linestyle='--',
-                                            xmin=xmin, xmax=xmax, title='BMFMC - approximate distributions')
-
-        plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
-        self.fignum += 1
-
+    # Plot the regression models
     def plot_regression_models(self):
 
         for i in range(self.n_models - 1):
@@ -358,6 +349,7 @@ class BMFMC:
                 plt.gcf().savefig('pngout/bmfmc_regression_model.png', dpi=300)
             self.fignum += 1
 
+    # Plot the approximate joint densities
     def plot_joint_densities(self):
 
         for i in range(self.n_models - 1):

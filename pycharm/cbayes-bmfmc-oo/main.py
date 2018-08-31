@@ -34,8 +34,8 @@ pf_method = 'bmfmc'
 # Number of model evaluations in increasing fidelity (the lowest-fidelity model will always have n_samples evals)
 # Only lambda_p and ode_pp support more than one (i.e. arbitrary many) low-fidelity level
 # The number of models will thus be len(n_evals) + 1
-n_evals = [200, 100, 50, 20, 10, 5]
-# n_evals = [10]
+# n_evals = [200, 100, 50, 20, 10, 5]
+n_evals = [50, 20, 5]
 
 # Training set selection strategy (support_covering, support_covering_adaptive, sampling, sampling_adaptive)
 training_set_strategy = 'support_covering_adaptive'
@@ -88,6 +88,7 @@ def get_prior_prior_pf_samples(n_samples):
             prior_pf_samples = hf_model.evaluate()
             prior_pf_samples = np.reshape(prior_pf_samples,
                                           (1, n_samples, np.shape(prior_pf_samples)[1]))
+            prior_pf_mc_samples = prior_pf_samples
 
         elif pf_method == 'bmfmc':
 
@@ -122,26 +123,6 @@ def get_prior_prior_pf_samples(n_samples):
                 print('Unsupported number of models for lambda_p.')
                 exit()
 
-            # Setup BMFMC
-            bmfmc = BMFMC(models=models,
-                          training_set_strategy=training_set_strategy, regression_type=regression_type)
-
-            # Apply BMFMC
-            bmfmc.apply_bmfmc_framework()
-
-            # Calculate Monte Carlo reference
-            bmfmc.calculate_mc_reference()
-
-            # Diagnostics
-            bmfmc.print_stats(mc=True)
-            bmfmc.plot_results(mc=True)
-            bmfmc.plot_regression_models()
-            bmfmc.plot_joint_densities()
-
-            # Get prior push-forward samples
-            prior_pf_samples = bmfmc.get_samples()
-            prior_pf_mc_samples = bmfmc.get_mc_samples()
-
         else:
             print('Unknown push-forward method: %r' % pf_method)
             exit()
@@ -173,6 +154,7 @@ def get_prior_prior_pf_samples(n_samples):
             prior_pf_samples = prior_pf_samples[indices, :]
             prior_pf_samples = np.reshape(prior_pf_samples,
                                           (1, n_samples, np.shape(prior_pf_samples)[1]))
+            prior_pf_mc_samples = prior_pf_samples
 
         elif pf_method == 'bmfmc':
 
@@ -192,26 +174,6 @@ def get_prior_prior_pf_samples(n_samples):
 
             hf_model = Model(eval_fun=lambda x: elliptic_pde.find_xy_pair(x, prior_samples, hf_samples),
                              n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
-
-            # Setup BMFMC
-            bmfmc = BMFMC(models=[lf_model, hf_model],
-                          training_set_strategy=training_set_strategy, regression_type=regression_type)
-
-            # Apply BMFMC
-            bmfmc.apply_bmfmc_framework()
-
-            # Calculate Monte Carlo reference
-            bmfmc.calculate_mc_reference()
-
-            # Diagnostics
-            bmfmc.print_stats(mc=True)
-            bmfmc.plot_results(mc=True)
-            bmfmc.plot_regression_models()
-            bmfmc.plot_joint_densities()
-
-            # Get prior push-forward samples
-            prior_pf_samples = bmfmc.get_samples()
-            prior_pf_mc_samples = bmfmc.get_mc_samples()
 
         else:
             print('Unknown push-forward method: %r' % pf_method)
@@ -241,6 +203,7 @@ def get_prior_prior_pf_samples(n_samples):
             prior_pf_samples = hf_model.evaluate()
             prior_pf_samples = np.reshape(prior_pf_samples,
                                           (1, n_samples, np.shape(prior_pf_samples)[1]))
+            prior_pf_mc_samples = prior_pf_samples
 
         elif pf_method == 'bmfmc':
 
@@ -282,26 +245,6 @@ def get_prior_prior_pf_samples(n_samples):
                 print('Unsupported number of models for ode_pp.')
                 exit()
 
-            # Setup BMFMC
-            bmfmc = BMFMC(models=models,
-                          training_set_strategy=training_set_strategy, regression_type=regression_type)
-
-            # Apply BMFMC
-            bmfmc.apply_bmfmc_framework()
-
-            # Calculate Monte Carlo reference
-            bmfmc.calculate_mc_reference()
-
-            # Diagnostics
-            bmfmc.print_stats(mc=True)
-            bmfmc.plot_results(mc=True)
-            bmfmc.plot_regression_models()
-            bmfmc.plot_joint_densities()
-
-            # Get prior push-forward samples
-            prior_pf_samples = bmfmc.get_samples()
-            prior_pf_mc_samples = bmfmc.get_mc_samples()
-
         else:
             print('Unknown push-forward method: %r' % pf_method)
             exit()
@@ -309,6 +252,27 @@ def get_prior_prior_pf_samples(n_samples):
     else:
         print('Unknown model: %r' % model)
         exit()
+
+    if pf_method == 'bmfmc':
+        # Setup BMFMC
+        bmfmc = BMFMC(models=models,
+                      training_set_strategy=training_set_strategy, regression_type=regression_type)
+
+        # Apply BMFMC
+        bmfmc.apply_bmfmc_framework()
+
+        # Calculate Monte Carlo reference
+        bmfmc.calculate_mc_reference()
+
+        # Diagnostics
+        bmfmc.print_stats(mc=True)
+        bmfmc.plot_results(mc=True)
+        bmfmc.plot_regression_models()
+        # bmfmc.plot_joint_densities()
+
+        # Get prior push-forward samples
+        prior_pf_samples = bmfmc.get_samples()
+        prior_pf_mc_samples = bmfmc.get_mc_samples()
 
     return prior_samples, prior_pf_samples, obs_loc, obs_scale, prior_pf_mc_samples
 
