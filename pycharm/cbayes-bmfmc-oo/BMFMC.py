@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import gaussian_process
 from sklearn.gaussian_process.kernels import WhiteKernel, RBF, ConstantKernel, Product, DotProduct
+from sklearn.cluster import KMeans
+from gp_extras.kernels import HeteroscedasticKernel
 
 import utils
 from Model import Model
@@ -79,14 +81,15 @@ class BMFMC:
 
                 # 4) Check convergence
                 if self.adaptive:
+                    n_evals = np.shape(hf_model.rv_samples)[0]
                     self.check_adaptive_convergence(this_dist=hf_model.distribution, previous_dist=previous_dist,
-                                                    adaptive_run=adaptive_run)
+                                                    adaptive_run=adaptive_run, n_evals=n_evals)
                     previous_dist = hf_model.distribution
 
         return self.models[-1].model_evals_pred
 
     # Check for convergence in terms of the KL to the previous model with less samples
-    def check_adaptive_convergence(self, this_dist, previous_dist, adaptive_run):
+    def check_adaptive_convergence(self, this_dist, previous_dist, adaptive_run, n_evals):
 
         kl = this_dist.calculate_kl_divergence(previous_dist)
 
@@ -95,7 +98,7 @@ class BMFMC:
 
         if kl <= self.adaptive_tol:
             self.adaptive = False
-            print('Converged!')
+            print('Converged after %d model evaluations.' % n_evals)
         elif adaptive_run >= 20:
             print('No convergence after 20 runs... aborting.')
             exit()
@@ -134,8 +137,8 @@ class BMFMC:
                 # For any other regression model, finding the correct x,y pair is a noisy task.
                 # We use the mean predictions of the GP to do that.
                 else:
-                    regression_model = self.regression_models[id-1]
-                    mu = regression_model.predict(self.models[id-1].model_evals_pred, return_std=False)
+                    regression_model = self.regression_models[id - 1]
+                    mu = regression_model.predict(self.models[id - 1].model_evals_pred, return_std=False)
                     idx = (np.abs(mu - x_train_linspace[i, :])).argmin()
                     x_train[i] = lf_model.eval_fun(lf_model.rv_samples_pred[idx, :])
 
@@ -188,9 +191,27 @@ class BMFMC:
         if self.regression_type == 'gaussian_process':
 
             # Fit a GP regression model to approximate p(q_l|q_l-1)
-            kernel = Product(RBF(), ConstantKernel()) + WhiteKernel() + ConstantKernel() + DotProduct()
+            kernel = ConstantKernel() * RBF() + WhiteKernel() + ConstantKernel() + DotProduct()
             # kernel = Matern() + WhiteKernel()
-            regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel)
+            regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
+            regression_model.fit(x_train, y_train)
+
+            # Predict q_l|q_l-1 at all low-fidelity samples
+            mu, sigma = regression_model.predict(x_pred, return_std=True)
+
+            # Generate low-fidelity samples from the predictions
+            hf_model_evals_pred = np.zeros((mu.shape[0],))
+            for i in range(mu.shape[0]):
+                hf_model_evals_pred[i] = mu[i] + sigma[i] * np.random.randn()
+
+        elif self.regression_type == 'heteroscedastic_gaussian_process':
+
+            # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
+            # See here for more info: https://github.com/jmetzen/gp_extras/
+            prototypes = KMeans(n_clusters=5).fit(x_train).cluster_centers_
+            kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1, (0.01, 100.0)) + HeteroscedasticKernel.construct(
+                prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
+            regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
             regression_model.fit(x_train, y_train)
 
             # Predict q_l|q_l-1 at all low-fidelity samples

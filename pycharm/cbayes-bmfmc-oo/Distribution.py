@@ -89,7 +89,8 @@ class Distribution:
     # Plot the sample histogram
     def plot_histogram(self, fignum):
         if self.n_dim == 1:
-            utils.plot_1d_hist(samples=self.samples, num=fignum, xlabel=self.rv_name, ylabel='$p($' + self.rv_name + '$)$')
+            utils.plot_1d_hist(samples=self.samples, num=fignum, xlabel=self.rv_name,
+                               ylabel='$p($' + self.rv_name + '$)$')
         elif self.n_dim == 2:
             print('2D KDE plots not implemented yet.')
             exit()

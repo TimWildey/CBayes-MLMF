@@ -32,6 +32,7 @@ Figures are stored in here as PNGs.
 * scipy
 * matplotlib
 * scikit-learn
+* gp_extras (https://github.com/jmetzen/gp_extras/) for the heteroscedastic GP
 
 ---
 

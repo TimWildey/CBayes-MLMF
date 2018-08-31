@@ -2,6 +2,7 @@
 import numpy as np
 import os
 import time
+import matplotlib.pyplot as plt
 
 # Model stuff
 import lambda_p
@@ -40,8 +41,8 @@ n_evals = [50, 20, 5]
 # Training set selection strategy (support_covering, support_covering_adaptive, sampling, sampling_adaptive)
 training_set_strategy = 'support_covering_adaptive'
 
-# Regression model type (gaussian_process)
-regression_type = 'gaussian_process'
+# Regression model type (gaussian_process, heteroscedastic_gaussian_process)
+regression_type = 'heteroscedastic_gaussian_process'
 
 
 # ---------------------------------------------------------- Todos ---------- #
@@ -52,7 +53,7 @@ regression_type = 'gaussian_process'
 
 # Framework
 # todo: (!!!) add support for multiple QoIs (some parts are already there)
-# todo: (!!) check how to deal with the case where one has fixed evaluation points
+# todo: (!!) check how to deal with the case where one has fixed evaluation points --> training_set_strategy: fixed
 
 # Distributions
 # todo: (!) implement transformations of random variables to operate in unconstrained probability space only
@@ -61,6 +62,7 @@ regression_type = 'gaussian_process'
 # todo: (!) implement other regression models
 
 # Adaptive training
+# todo: (!!) adaptive sampling using the GP predictive uncertainty --> training_set_strategy: sampling_gp_adaptive
 # todo: (!) different options how to choose samples: uniform / LHS / sparse grids
 
 
@@ -68,7 +70,6 @@ regression_type = 'gaussian_process'
 
 
 def get_prior_prior_pf_samples(n_samples):
-
     prior_samples = prior_pf_samples = obs_loc = obs_scale = prior_pf_mc_samples = []
 
     if model == 'lambda_p':
@@ -175,6 +176,8 @@ def get_prior_prior_pf_samples(n_samples):
             hf_model = Model(eval_fun=lambda x: elliptic_pde.find_xy_pair(x, prior_samples, hf_samples),
                              n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
+            models = [lf_model, hf_model]
+
         else:
             print('Unknown push-forward method: %r' % pf_method)
             exit()
@@ -229,7 +232,6 @@ def get_prior_prior_pf_samples(n_samples):
             elif len(n_evals) > 2:
                 models = [lf_model]
                 dts = np.linspace(dt_lf, dt_hf, len(n_evals) + 2)
-                # dts = [dt_lf, 0.9, 0.6, dt_hf]
                 for i in range(len(n_evals) - 1):
                     settings = ode_pp.Settings(finalt=finalt, dt=dts[i + 1], u0=u0)
                     models.append(Model(eval_fun=lambda x, settings=settings: ode_pp.ode_pp(x, settings)[0, -1],
@@ -368,8 +370,6 @@ if __name__ == '__main__':
         lap = time.time()
 
         # Plot Posterior-Prior KLs
-        import matplotlib.pyplot as plt
-
         plt.figure(4)
         plt.plot(range(1, len(n_evals) + 2), mc_kl * np.ones((len(n_evals) + 1,)), 'k--', label='MC KL')
         plt.plot(range(1, len(n_evals) + 2), kls, '-x', label='Model KLs')

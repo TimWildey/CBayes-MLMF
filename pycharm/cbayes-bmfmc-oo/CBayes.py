@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import warnings
 
 from Distribution import Distribution
 
@@ -53,6 +54,10 @@ class CBayesPosterior:
 
         self.r = r
         self.acc_rate = idx.size / r.shape[0]
+
+        if self.acc_rate < 1.0e-2:
+            warnings.warn('Small acceptance rate: %f / %d accepted samples.' % (
+                self.acc_rate, idx.size))
 
         self.p_obs.samples = self.p_obs.samples[idx]
 
