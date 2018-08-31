@@ -1,5 +1,6 @@
 import numpy as np
 import utils
+import warnings
 from scipy.stats import gaussian_kde as gkde
 from scipy.integrate import trapz
 
@@ -58,6 +59,10 @@ class Distribution:
         p = p.kernel_density(np.squeeze(self.samples))
         p += 1e-10
         kl = np.mean(np.log(np.divide(q, p)))
+
+        if kl < 0.0:
+            warnings.warn('Warning: Negative KL: %f' % kl)
+
         return kl
 
     # Estimate the KL divergence between q and p

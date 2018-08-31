@@ -87,13 +87,8 @@ class BMFMC:
 
         kl = this_dist.calculate_kl_divergence(previous_dist)
 
-        if kl < -1e-2:
-            print('')
-            print('Negative KL: %f' % kl)
-            exit()
-        else:
-            print('')
-            print('Adaptive run %d, KL: %f' % (adaptive_run, kl))
+        print('')
+        print('Adaptive run %d, KL: %f' % (adaptive_run, kl))
 
         if kl <= self.adaptive_tol:
             self.adaptive = False
@@ -114,9 +109,11 @@ class BMFMC:
                                                num=hf_model.n_evals)
                 x_train_linspace = np.reshape(x_train_linspace, (hf_model.n_evals, hf_model.n_qoi))
             else:
-                diffs = np.diff(self.regression_models[id].X_train_, n=1, axis=0)
+                # Create new points between existing ones
+                sorted_xtrain = np.sort(self.regression_models[id].X_train_, axis=0)
+                diffs = np.diff(sorted_xtrain, n=1, axis=0)
                 diffs = np.reshape(diffs, (np.shape(diffs)[0], hf_model.n_qoi))
-                x_train_linspace = self.regression_models[id].X_train_[:-1, :] + 0.5 * diffs
+                x_train_linspace = sorted_xtrain[:-1, :] + 0.5 * diffs
 
             n_train = np.shape(x_train_linspace)[0]
 
