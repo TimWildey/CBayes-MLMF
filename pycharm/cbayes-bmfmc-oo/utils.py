@@ -4,15 +4,15 @@ import numpy as np
 
 
 def plot_1d_data(x, y, marker='None', markersize=5, linestyle='-', linewidth=3, color='C0', label='', num=1,
-                 xlabel='$x$', ylabel='$y$', title='', xlim=[], ylim=[]):
+                 xlabel='$x$', ylabel='$y$', title='', xlim=None, ylim=None):
     if len(str(num)) >= 3:
         plt.subplot(num)
     else:
         plt.figure(num)
 
-    if len(xlim) == 0:
+    if xlim is None:
         xlim = [np.min(x), np.max(x)]
-    if len(ylim) == 0:
+    if ylim is None:
         ylim = [np.min(y), np.max(y)]
 
     plt.plot(x, y, marker=marker, markersize=markersize, linestyle=linestyle, linewidth=linewidth,
@@ -80,7 +80,7 @@ def plot_1d_conf(x_pred, y_pred, sigma, num=1, title=''):
     plt.title(title)
 
 
-def plot_2d_scatter(samples_x, samples_y, marker='o', num=1, title='', xlim=[], ylim=[], xlabel="$x$", ylabel="$y$"):
+def plot_2d_scatter(samples_x, samples_y, marker='o', num=1, title='', xlim=None, ylim=None, xlabel="$x$", ylabel="$y$"):
 
     if len(str(num)) >= 3:
         plt.subplot(num)
@@ -95,9 +95,9 @@ def plot_2d_scatter(samples_x, samples_y, marker='o', num=1, title='', xlim=[], 
     x, y, z = x[idx], y[idx], z[idx]
     plt.scatter(x, y, c=z, s=50, edgecolor='', marker=marker)
 
-    if len(xlim) == 0:
+    if xlim is None:
         xlim = [np.min(x), np.max(x)]
-    if len(ylim) == 0:
+    if ylim is None:
         ylim = [np.min(y), np.max(y)]
 
     plt.xlabel(xlabel)
@@ -108,17 +108,17 @@ def plot_2d_scatter(samples_x, samples_y, marker='o', num=1, title='', xlim=[], 
     plt.title(title)
 
 
-def plot_2d_contour(samples_x, samples_y, num=1, title='', xlim=[], ylim=[], xlabel="$x$", ylabel="$y$"):
+def plot_2d_contour(samples_x, samples_y, num=1, title='', xlim=None, ylim=None, xlabel="$x$", ylabel="$y$"):
 
     if len(str(num)) >= 3:
         plt.subplot(num)
     else:
         plt.figure(num)
 
-    if len(xlim) == 0:
+    if xlim is None:
         xlim = [np.min(samples_x), np.max(samples_x)]
 
-    if len(ylim) == 0:
+    if ylim is None:
         ylim = [np.min(samples_y), np.max(samples_y)]
 
     xy_kde = gkde(np.vstack([samples_x, samples_y]))

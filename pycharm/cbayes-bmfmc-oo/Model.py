@@ -18,27 +18,23 @@ class Model:
     # - label: model label
     # - rv_name: QoI name
 
-    def __init__(self, eval_fun, n_evals, n_qoi, rv_samples=[], rv_samples_pred=[], label='', rv_name=''):
+    def __init__(self, eval_fun, n_evals, n_qoi, rv_samples=None, rv_samples_pred=None, label='', rv_name=''):
 
-        if len(rv_samples) != 0:
-            self.rv_samples = []
+        self.rv_samples = None
+        self.n_random = None
+        self.n_samples = None
+        if rv_samples is not None:
             self.set_rv_samples(rv_samples)
-        else:
-            self.rv_samples = []
-            self.n_random = []
-            self.n_samples = []
 
-        if len(rv_samples_pred) != 0:
+        if rv_samples_pred is not None:
             self.set_rv_samples_pred(rv_samples_pred)
-        else:
-            self.rv_samples_pred = []
 
         self.eval_fun = eval_fun
         self.n_evals = n_evals
         self.n_qoi = n_qoi
-        self.model_evals = []
-        self.model_evals_pred = []
-        self.distribution = []
+        self.model_evals = None
+        self.model_evals_pred = None
+        self.distribution = None
         self.label = label
         self.rv_name = rv_name
 
@@ -46,7 +42,7 @@ class Model:
     def evaluate(self):
 
         # If there are no previous model evaluations, create an empty vector
-        if len(self.model_evals) == 0:
+        if self.model_evals is None:
             self.model_evals = np.zeros((self.n_evals, self.n_qoi))
             for i in range(self.n_evals):
                 self.model_evals[i, :] = self.eval_fun(self.rv_samples[i, :])
@@ -62,7 +58,7 @@ class Model:
     def set_rv_samples(self, rv_samples):
 
         # If there are no rv_samples, create the vector
-        if len(self.rv_samples) == 0:
+        if self.rv_samples is None:
             self.rv_samples = rv_samples
             self.n_samples = np.shape(rv_samples)[0]
             self.n_random = np.shape(rv_samples)[1]

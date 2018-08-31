@@ -20,14 +20,14 @@ class BMFMC:
     def __init__(self, models, training_set_strategy, regression_type):
 
         self.models = models
-        self.mc_model = 0
+        self.mc_model = None
         self.n_models = len(models)
         self.training_set_strategy = training_set_strategy
         self.regression_type = regression_type
         self.regression_models = []
         self.fignum = 10
         self.adaptive = True
-        self.adaptive_tol = 2.0e-3
+        self.adaptive_tol = 1.0e-3
 
     def apply_bmfmc_framework(self):
 
@@ -52,14 +52,14 @@ class BMFMC:
 
             # Add samples adaptively until convergence
             previous_dist = lf_model.distribution
-            x_train = []
+            x_train = None
             adaptive_run = 0
 
             while self.adaptive:
                 adaptive_run += 1
 
                 # 2) Select lower-fidelity model evaluation points and evaluate the next higher-fidelity model
-                if len(x_train) == 0:
+                if x_train is None:
                     x_train = self.create_training_set(lf_model=lf_model, hf_model=hf_model, id=i)
                 else:
                     x_train = np.append(x_train, self.create_training_set(lf_model=lf_model, hf_model=hf_model, id=i),
@@ -221,7 +221,7 @@ class BMFMC:
 
     def get_mc_samples(self):
 
-        if self.mc_model != 0:
+        if self.mc_model is not None:
 
             return self.mc_model.model_evals_pred
 

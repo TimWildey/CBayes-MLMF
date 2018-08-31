@@ -29,10 +29,10 @@ class CBayesPosterior:
         self.p_obs = p_obs
         self.p_prior = p_prior
         self.p_prior_pf = p_prior_pf
-        self.p_post = []
-        self.p_post_pf = []
-        self.r = []
-        self.acc_rate = []
+        self.p_post = None
+        self.p_post_pf = None
+        self.r = None
+        self.acc_rate = None
 
     # Perform accept/reject sampling on a set of proposal samples using the weights r associated with the set of
     # samples and return the indices idx of the proposal sample set that are accepted.

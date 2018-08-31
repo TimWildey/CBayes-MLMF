@@ -1,6 +1,7 @@
 # Standard stuff
 import numpy as np
 import os
+import time
 
 # Model stuff
 import lambda_p
@@ -54,7 +55,6 @@ regression_type = 'gaussian_process'
 # todo: (!!) check how to deal with the case where one has fixed evaluation points
 
 # Distributions
-# todo: (!) store KDE evaluations for distributions in a vector for reuse
 # todo: (!) implement transformations of random variables to operate in unconstrained probability space only
 
 # Regression
@@ -86,6 +86,8 @@ def get_prior_prior_pf_samples(n_samples):
 
             # Brute force Monte Carlo
             prior_pf_samples = hf_model.evaluate()
+            prior_pf_samples = np.reshape(prior_pf_samples,
+                                          (1, n_samples, np.shape(prior_pf_samples)[1]))
 
         elif pf_method == 'bmfmc':
 
@@ -168,8 +170,9 @@ def get_prior_prior_pf_samples(n_samples):
         if pf_method == 'mc':
 
             # Monte Carlo reference
-            prior_pf_samples = prior_pf_samples[np.random.choice(range(prior_pf_samples.shape[0]),
-                                                                 size=n_samples, replace=False), :]
+            prior_pf_samples = prior_pf_samples[indices, :]
+            prior_pf_samples = np.reshape(prior_pf_samples,
+                                          (1, n_samples, np.shape(prior_pf_samples)[1]))
 
         elif pf_method == 'bmfmc':
 
@@ -236,6 +239,8 @@ def get_prior_prior_pf_samples(n_samples):
 
             # Brute force Monte Carlo
             prior_pf_samples = hf_model.evaluate()
+            prior_pf_samples = np.reshape(prior_pf_samples,
+                                          (1, n_samples, np.shape(prior_pf_samples)[1]))
 
         elif pf_method == 'bmfmc':
 
@@ -313,6 +318,9 @@ def get_prior_prior_pf_samples(n_samples):
 
 if __name__ == '__main__':
 
+    # Timing
+    start = time.time()
+
     # Clean pngout folder
     if os.path.isdir('pngout'):
         os.system('rm -rf pngout/')
@@ -324,6 +332,10 @@ if __name__ == '__main__':
     print('')
     print('Calculating the Prior push-forward ...')
     prior_samples, prior_pf_samples, obs_loc, obs_scale, prior_pf_mc_samples = get_prior_prior_pf_samples(n_samples)
+
+    end = time.time()
+    print('(BMFMC elapsed time: %fs)\n' % (end - start))
+    lap = time.time()
 
     # Prior
     p_prior = Distribution(prior_samples, rv_name='$\lambda$', label='Prior', kde=False)
@@ -347,6 +359,10 @@ if __name__ == '__main__':
     # Plot
     cbayes_post.plot_results(1)
 
+    end = time.time()
+    print('(High-fidelity CBayes elapsed time: %fs)\n' % (end - lap))
+    lap = time.time()
+
     # Low-fidelity and Monte Carlo comparisons
     if pf_method == 'bmfmc':
 
@@ -355,7 +371,7 @@ if __name__ == '__main__':
 
         # Create low-fidelity CBayes posteriors
         for i in range(len(n_evals)):
-            print('Evaluating the low-fidelity posteriors %d / %d ...' % (i+1, len(n_evals)))
+            print('Evaluating the low-fidelity posteriors %d / %d ...' % (i + 1, len(n_evals)))
             p_prior_pf_lf = Distribution(prior_pf_samples[i, :, :], rv_name='$Q$', label='Prior-PF-LF')
             obs_samples = np.random.randn(n_samples) * obs_scale + obs_loc
             obs_samples = np.reshape(obs_samples, (n_samples, 1))
@@ -366,6 +382,10 @@ if __name__ == '__main__':
             kls[i] = cbayes_post_lf.get_prior_post_kl()
             if i == 0:
                 cbayes_post_lf.plot_results(2)
+
+        end = time.time()
+        print('(Low-fidelities CBayes elapsed time: %fs)\n' % (end - lap))
+        lap = time.time()
 
         # Monte Carlo comparison
         p_prior_pf_mc = Distribution(prior_pf_mc_samples, rv_name='$Q$', label='Prior-PF-MC')
@@ -379,8 +399,13 @@ if __name__ == '__main__':
         mc_kl = cbayes_post_mc.get_prior_post_kl()
         cbayes_post_mc.plot_results(3)
 
+        end = time.time()
+        print('(Monte Carlo CBayes elapsed time: %fs)\n' % (end - lap))
+        lap = time.time()
+
         # Plot Posterior-Prior KLs
         import matplotlib.pyplot as plt
+
         plt.figure(4)
         plt.plot(range(1, len(n_evals) + 2), mc_kl * np.ones((len(n_evals) + 1,)), 'k--', label='MC KL')
         plt.plot(range(1, len(n_evals) + 2), kls, '-x', label='Model KLs')
@@ -390,6 +415,9 @@ if __name__ == '__main__':
         plt.ylabel('KL')
         plt.title('Prior-Posterior KLs')
         plt.gcf().savefig('pngout/cbayes_prior_post_kls.png', dpi=300)
+
+    end = time.time()
+    print('(Total elapsed time: %fs)' % (end - start))
 
 
 # --------------------------------------------------------------------------- #
