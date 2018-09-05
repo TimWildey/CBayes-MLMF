@@ -135,10 +135,16 @@ if __name__ == '__main__':
     # exit()
 
     x0_qvals = lf_0_sol[:, 0, -1]
+    y0_qvals = lf_0_sol[:, 1, -1]
     x1_qvals = lf_1_sol[:, 0, -1]
+    y1_qvals = lf_1_sol[:, 1, -1]
     x2_qvals = lf_2_sol[:, 0, -1]
+    y2_qvals = lf_2_sol[:, 1, -1]
     y_qvals = hf_sol[:, 0, -1]
+    yy_qvals = hf_sol[:, 1, -1]
     lin = np.linspace(np.min([x0_qvals, y_qvals]), np.max([x0_qvals, y_qvals]), len(x1_qvals))
+
+    # Correlate the first outputs qoi_1
 
     # Correlate x0 and x1
     plt.figure()
@@ -154,13 +160,39 @@ if __name__ == '__main__':
 
     # Correlate x2 and y
     plt.figure()
-    plt.plot(x2_qvals, y_qvals, 'oC0', label='$x_1$ vs. $y$')
+    plt.plot(x2_qvals, y_qvals, 'oC0', label='$x_2$ vs. $y$')
     plt.plot(lin, lin, '--k', label='$x=y$')
     plt.legend()
 
     # Correlate x0 and y
     plt.figure()
-    plt.plot(x0_qvals, y_qvals, 'oC3', label='$x_2$ vs. $y$')
+    plt.plot(x0_qvals, y_qvals, 'oC3', label='$x_0$ vs. $y$')
+    plt.plot(lin, lin, '--k', label='$x=y$')
+    plt.legend()
+
+    # Correlate the second outputs qoi_2
+
+    # Correlate y0 and y1
+    plt.figure()
+    plt.plot(y0_qvals, y1_qvals, 'oC2', label='$y_0$ vs. $y_1$')
+    plt.plot(lin, lin, '--k', label='$x=y$')
+    plt.legend()
+
+    # Correlate y1 and y2
+    plt.figure()
+    plt.plot(y1_qvals, y2_qvals, 'oC1', label='$y_1$ vs. $y_2$')
+    plt.plot(lin, lin, '--k', label='$x=y$')
+    plt.legend()
+
+    # Correlate x2 and yy
+    plt.figure()
+    plt.plot(y2_qvals, yy_qvals, 'oC0', label='$y_2$ vs. $yy$')
+    plt.plot(lin, lin, '--k', label='$x=y$')
+    plt.legend()
+
+    # Correlate y0 and yy
+    plt.figure()
+    plt.plot(y0_qvals, yy_qvals, 'oC3', label='$y_0$ vs. $yy$')
     plt.plot(lin, lin, '--k', label='$x=y$')
     plt.legend()
 

@@ -23,8 +23,8 @@ class CBayesPosterior:
         assert type(p_prior) is Distribution, "p_prior is not of type Distribution: %r" % p_prior
         assert type(p_prior_pf) is Distribution, "p_prior_pf is not of type Distribution: %r" % p_prior_pf
 
-        if p_obs.n_dim > 1:
-            print('Framework still lives in a 1-D world.')
+        if p_obs.n_dim > 3:
+            print('Framework has only been tested with up to 3 QoIs.')
             exit()
 
         self.p_obs = p_obs
@@ -34,14 +34,15 @@ class CBayesPosterior:
         self.p_post_pf = None
         self.r = None
         self.acc_rate = None
+        self.acc_idx = None
 
     # Perform accept/reject sampling on a set of proposal samples using the weights r associated with the set of
     # samples and return the indices idx of the proposal sample set that are accepted.
     def generate_posterior_samples(self):
 
         # Calculate the weights
-        r = np.divide(self.p_obs.kernel_density(np.squeeze(self.p_prior_pf.samples)) + 1e-10,
-                      self.p_prior_pf.kernel_density(np.squeeze(self.p_prior_pf.samples)) + 1e-10)
+        r = np.divide(self.p_obs.kernel_density(np.squeeze(self.p_prior_pf.samples).T) + 1e-10,
+                      self.p_prior_pf.kernel_density(np.squeeze(self.p_prior_pf.samples).T) + 1e-10)
 
         # Check against
         check = np.random.uniform(low=0, high=1, size=r.size)
@@ -59,9 +60,7 @@ class CBayesPosterior:
             warnings.warn('Small acceptance rate: %f / %d accepted samples.' % (
                 self.acc_rate, idx.size))
 
-        self.p_obs.samples = self.p_obs.samples[idx]
-
-        return self.p_prior.samples[idx], self.p_obs.samples
+        return self.p_prior.samples[idx], self.p_obs.samples[idx]
 
     # Create the posterior and its push-forward
     def setup_posterior_and_pf(self):
@@ -95,8 +94,8 @@ class CBayesPosterior:
 
         # The posterior push-forward mean and std
         # (these should match the observed density)
-        print('Posterior push-forward mean:\t%f' % self.p_post_pf.mean())
-        print('Posterior push-forward std:\t\t%f' % self.p_post_pf.std())
+        print('Posterior push-forward mean:\t%s' % self.p_post_pf.mean())
+        print('Posterior push-forward std:\t\t%s' % self.p_post_pf.std())
 
         # The KL between the push-forward of the posterior and the observed density
         # (this should be very close to zero)
@@ -117,21 +116,43 @@ class CBayesPosterior:
         print('')
 
     # Plot results
-    def plot_results(self, fignum=10):
+    def plot_results(self, fignum=1):
 
         # Determine bounds
         xmin = np.min([np.min(self.p_prior_pf.samples), np.min(self.p_obs.samples)])
         xmax = np.max([np.max(self.p_prior_pf.samples), np.max(self.p_obs.samples)])
 
         # Plot
-        self.p_prior_pf.plot_kde(fignum=fignum, color='C0', xmin=xmin, xmax=xmax)
-        self.p_obs.plot_kde(fignum=fignum, color='C1', xmin=xmin, xmax=xmax)
-        self.p_post_pf.plot_kde(fignum=fignum, color='C2', linestyle='--', xmin=xmin, xmax=xmax,
-                                title='CBayes')
+        if self.p_obs.n_dim == 1:
+            self.p_prior_pf.plot_kde(fignum=fignum, color='C0', xmin=xmin, xmax=xmax)
+            self.p_obs.plot_kde(fignum=fignum, color='C1', xmin=xmin, xmax=xmax)
+            self.p_post_pf.plot_kde(fignum=fignum, color='C2', linestyle='--', xmin=xmin, xmax=xmax,
+                                    title='CBayes')
+        elif self.p_obs.n_dim == 2:
+            import seaborn as sns
+            sns.kdeplot(self.p_prior_pf.samples[:, 0], self.p_prior_pf.samples[:, 1], shade=True, shade_lowest=False,
+                        cmap='Blues')
+            sns.kdeplot(self.p_obs.samples[:, 0], self.p_obs.samples[:, 1], shade=True, shade_lowest=False, cmap='Reds')
+            sns.kdeplot(self.p_post_pf.samples[:, 0], self.p_post_pf.samples[:, 1], cmap='Greys', alpha=1.0)
 
         if fignum == 2:
             plt.gcf().savefig('pngout/cbayes_dists_lf.png', dpi=300)
+            plt.clf()
         elif fignum == 3:
             plt.gcf().savefig('pngout/cbayes_dists_mc.png', dpi=300)
+            plt.clf()
         else:
             plt.gcf().savefig('pngout/cbayes_dists_hf.png', dpi=300)
+            plt.clf()
+
+            # Plot some bivariate distributions
+            if self.p_obs.n_dim == 2:
+                self.p_prior_pf.plot_kde(fignum=fignum)
+                plt.gcf().savefig('pngout/cbayes_dists_hf_prior_pf.png', dpi=300)
+                plt.clf()
+                self.p_obs.plot_kde(fignum=fignum)
+                plt.gcf().savefig('pngout/cbayes_dists_obs.png', dpi=300)
+                plt.clf()
+                self.p_post_pf.plot_kde(fignum=fignum)
+                plt.gcf().savefig('pngout/cbayes_dists_hf_post_pf.png', dpi=300)
+                plt.clf()

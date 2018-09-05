@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde as gkde
 import numpy as np
+import seaborn as sns
+import pandas as pd
 
 
 # Plot arbitrary 1D data i.e. vector x over vector y
@@ -43,6 +45,21 @@ def plot_1d_kde(qkde, xmin=0.0, xmax=1.0, linestyle='-', linewidth=3, color='C0'
     plt.grid()
     plt.legend(loc='upper left')
     plt.title(title)
+
+
+# Plot a 2D kernel density estimation
+def plot_2d_kde(samples, xlabel='$x_1$', ylabel='$x_2$', num=1, cmap='Blues'):
+
+    if len(str(num)) >= 3:
+        plt.subplot(num)
+    else:
+        plt.figure(num)
+
+    df = pd.DataFrame(samples, columns=[xlabel, ylabel])
+    g = sns.jointplot(x=xlabel, y=ylabel, data=df, kind='kde', color='C0', shade=True, shade_lowest=True, cmap=cmap)
+    g.plot_joint(plt.scatter, c='k', alpha=0.3, s=1, linewidth=0.0, marker='o')
+    g.ax_joint.collections[0].set_alpha(0)
+    g.set_axis_labels(xlabel, ylabel)
 
 
 # Plot a 1D histogram given samples

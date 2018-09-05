@@ -29,8 +29,39 @@ def load_data():
     return lam, qvals
 
 
+def load_data_2d():
+    filepath = os.path.abspath(os.path.dirname(__file__))
+    data_set = sio.loadmat(filepath + '/elliptic_kde100_10K.mat')
+    qvals = data_set['qq']  # QoI samples, shape (10k, 3)
+    qvals = qvals[:, 0:2]  # Only using first two QoIs here --> (10k, 2)
+    lam = data_set['pp']  # Random parameter samples
+    lam = np.transpose(lam)  # reshape to (10k, 100)
+
+    return lam, qvals
+
+
+def load_data_3d():
+    filepath = os.path.abspath(os.path.dirname(__file__))
+    data_set = sio.loadmat(filepath + '/elliptic_kde100_10K.mat')
+    qvals = data_set['qq']  # QoI samples, shape (10k, 3)
+    lam = data_set['pp']  # Random parameter samples
+    lam = np.transpose(lam)  # reshape to (10k, 100)
+
+    return lam, qvals
+
+
 def get_prior_samples():
     lam, qvals = load_data()
+    return lam
+
+
+def get_prior_samples_2d():
+    lam, qvals = load_data_2d()
+    return lam
+
+
+def get_prior_samples_3d():
+    lam, qvals = load_data_3d()
     return lam
 
 
@@ -38,7 +69,7 @@ def construct_lowfi_model(X_train, y_train):
 
     # Fit a simple GP as a surrogate to the deterministic forward problem
     kernel = Matern()
-    gp = gaussian_process.GaussianProcessRegressor(kernel=kernel)
+    gp = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
     gp.fit(X_train, y_train)
 
     return gp
@@ -48,7 +79,7 @@ def construct_lowfi_model_and_get_samples(X_train, y_train, X_test):
 
     # Fit a simple GP as a surrogate to the deterministic forward problem
     kernel = Matern()
-    gp = gaussian_process.GaussianProcessRegressor(kernel=kernel)
+    gp = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
     gp.fit(X_train, y_train)
 
     return gp.predict(X_test)
@@ -62,7 +93,7 @@ def get_lowfi_samples(gp, X_test, n_lf, fun=lambda x: x):
 
     # Choose the specified number of lowfi samples
     indices = np.random.choice(range(X_test.shape[0]), size=n_lf, replace=False)
-    X_test = X_test[indices]
+    X_test = X_test[indices, :]
 
     # Predict the lowfi QoIs
     qvals_lowfi = gp.predict(X_test)
@@ -76,7 +107,7 @@ def get_lowfi_samples(gp, X_test, n_lf, fun=lambda x: x):
 def get_highfi_samples(y, indices):
 
     # Choose hifi samples according to the specified indices
-    qvals_highfi = y[indices]
+    qvals_highfi = y[indices, :]
 
     return qvals_highfi
 

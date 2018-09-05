@@ -15,19 +15,17 @@ from Model import Model
 from BMFMC import BMFMC
 from CBayes import CBayesPosterior
 
-
 # ------------------------------------------------- Config - General -------- #
 
 
 # Number of lowest-fidelity samples (1e4 should be fine for 1 QoI)
 n_samples = int(1e4)
 
-# Forward model (lambda_p, ellptic_pde, ode_pp)
+# Forward model (lambda_p, ellptic_pde, elliptic_pde_2d, elliptic_pde_3d, ode_pp, ode_pp_2d)
 model = 'elliptic_pde'
 
 # Push-forward method (mc, bmfmc)
 pf_method = 'bmfmc'
-
 
 # ----------------------------------------------------Config - BMFMC -------- #
 
@@ -35,13 +33,14 @@ pf_method = 'bmfmc'
 # Number of model evaluations in increasing fidelity (the lowest-fidelity model will always have n_samples evals)
 # Only lambda_p and ode_pp support more than one (i.e. arbitrary many) low-fidelity level
 # The number of models will thus be len(n_evals) + 1
-# n_evals = [200, 100, 50, 20, 10]
+n_evals = [200, 100, 50, 20, 10]
+# n_evals = [100, 50, 20]
 n_evals = [100]
 
 # Training set selection strategy (support_covering, support_covering_adaptive, sampling, sampling_adaptive)
-training_set_strategy = 'support_covering'
+training_set_strategy = 'sampling'
 
-# Regression model type (gaussian_process, heteroscedastic_gaussian_process)
+# Regression model type (gaussian_process, heteroscedastic_gaussian_process, bayesian_regression)
 regression_type = 'heteroscedastic_gaussian_process'
 
 
@@ -49,14 +48,16 @@ regression_type = 'heteroscedastic_gaussian_process'
 
 
 # Framework
-# todo: (!!!) add support for multiple QoIs (some parts are already there)
 # todo: (!!) check how to deal with the case where one has fixed evaluation points --> training_set_strategy: fixed
+# todo: (!!) compare BMFMC and MC L1 error as a benchmark
+# todo: (!) enhance plotting: https://www.safaribooksonline.com/library/view/python-data-science/9781491912126/ch04.html
 
 # Distributions
 # todo: (!) implement transformations of random variables to operate in unconstrained probability space only
 
 # Regression
-# todo: (!) implement other regression models
+# todo: (!) check out http://scikit-learn.org/stable/auto_examples/linear_model/plot_bayesian_ridge.html#sphx-glr-auto-examples-linear-model-plot-bayesian-ridge-py
+# todo: (!) think about other regression models
 
 # Adaptive training
 # todo: (!!) adaptive sampling using the GP predictive uncertainty --> training_set_strategy: sampling_gp_adaptive
@@ -69,11 +70,16 @@ regression_type = 'heteroscedastic_gaussian_process'
 def get_prior_prior_pf_samples(n_samples):
     prior_samples = prior_pf_samples = obs_loc = obs_scale = prior_pf_mc_samples = []
 
+    # Check push forward method
+    if pf_method not in ['mc', 'bmfmc']:
+        print('Unknown push-forward method: %r' % pf_method)
+        exit()
+
     if model == 'lambda_p':
 
         n_qoi = 1
-        obs_loc = 0.25
-        obs_scale = 0.1
+        obs_loc = [0.25]
+        obs_scale = [0.1]
         prior_samples = lambda_p.get_prior_samples(n_samples)
 
         if pf_method == 'mc':
@@ -121,18 +127,26 @@ def get_prior_prior_pf_samples(n_samples):
                 print('Unsupported number of models for lambda_p.')
                 exit()
 
-        else:
-            print('Unknown push-forward method: %r' % pf_method)
-            exit()
+    elif model in ['elliptic_pde', 'elliptic_pde_2d', 'elliptic_pde_3d']:
 
-    elif model == 'elliptic_pde':
+        # Setup and load data
+        if model == 'elliptic_pde':
+            n_qoi = 1
+            obs_loc = [0.7]
+            obs_scale = [0.01]
+            lam, qvals = elliptic_pde.load_data()
 
-        n_qoi = 1
-        obs_loc = 0.7
-        obs_scale = 0.01
+        elif model == 'elliptic_pde_2d':
+            n_qoi = 2
+            obs_loc = [0.7, 0.1]
+            obs_scale = [0.01, 0.01]
+            lam, qvals = elliptic_pde.load_data_2d()
 
-        # Load dataset
-        lam, qvals = elliptic_pde.load_data()
+        elif model == 'elliptic_pde_3d':
+            n_qoi = 3
+            obs_loc = [0.71, 0.12, 0.48]
+            obs_scale = [0.01, 0.01, 0.01]
+            lam, qvals = elliptic_pde.load_data_3d()
 
         # Data split for surrogate model creation
         split = 0.05
@@ -179,15 +193,11 @@ def get_prior_prior_pf_samples(n_samples):
 
             models = [lf_model, hf_model]
 
-        else:
-            print('Unknown push-forward method: %r' % pf_method)
-            exit()
-
     elif model == 'ode_pp':
 
         n_qoi = 1
-        obs_loc = 2.5
-        obs_scale = 0.1
+        obs_loc = [2.5]
+        obs_scale = [0.1]
         prior_samples = ode_pp.get_prior_samples(n_samples)
 
         # Model settings
@@ -248,13 +258,86 @@ def get_prior_prior_pf_samples(n_samples):
                 print('Unsupported number of models for ode_pp.')
                 exit()
 
-        else:
-            print('Unknown push-forward method: %r' % pf_method)
-            exit()
+    elif model == 'ode_pp_2d':
+
+        n_qoi = 2
+        obs_loc = [2.5, 4.5]
+        obs_scale = [0.25, 0.3]
+        prior_samples = ode_pp.get_prior_samples(n_samples)
+
+        # Model settings
+        u0 = np.array([5, 1])
+        finalt = 1.0
+        dt_hf = 0.5
+
+        hf_settings = ode_pp.Settings(finalt=finalt, dt=dt_hf, u0=u0)
+
+        if pf_method == 'mc':
+
+            # Create the high-fidelity model
+            hf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, hf_settings)[:, -1], rv_samples=prior_samples,
+                             n_evals=n_samples, n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
+
+            # Brute force Monte Carlo
+            prior_pf_samples = hf_model.evaluate()
+            prior_pf_samples = np.reshape(prior_pf_samples,
+                                          (1, n_samples, n_qoi))
+            prior_pf_mc_samples = prior_pf_samples
+
+        elif pf_method == 'bmfmc':
+
+            # Create a low-fidelity model
+            dt_lf = 1.0
+            lf_settings = ode_pp.Settings(finalt=finalt, dt=dt_lf, u0=u0)
+            lf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, lf_settings)[:, -1] + 1.0,
+                             rv_samples=prior_samples,
+                             rv_samples_pred=prior_samples, n_evals=n_samples, n_qoi=n_qoi,
+                             rv_name='$q_0$', label='Low-fidelity')
+
+            # Create a high-fidelity model
+            hf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, hf_settings)[:, -1], n_evals=n_evals[-1],
+                             n_qoi=n_qoi,
+                             rv_name='$Q$', label='High-fidelity')
+
+            if len(n_evals) == 2:
+                # Create a mid fidelity model
+                dt_mf = 0.7
+                mf_settings = ode_pp.Settings(finalt=finalt, dt=dt_mf, u0=u0)
+                mf_model = Model(eval_fun=lambda x: ode_pp.ode_pp(x, mf_settings)[:, -1], n_evals=n_evals[0],
+                                 n_qoi=n_qoi, rv_name='$q_m$', label='Mid-fidelity')
+                models = [lf_model, mf_model, hf_model]
+
+            elif len(n_evals) > 2:
+                models = [lf_model]
+                dts = np.linspace(dt_lf, dt_hf, len(n_evals) + 2)
+                for i in range(len(n_evals) - 1):
+                    settings = ode_pp.Settings(finalt=finalt, dt=dts[i + 1], u0=u0)
+                    models.append(Model(eval_fun=lambda x, settings=settings: ode_pp.ode_pp(x, settings)[:, -1],
+                                        n_evals=n_evals[i],
+                                        n_qoi=n_qoi, rv_name='$q_%d$' % int(i + 1),
+                                        label='Mid-%d-fidelity' % int(i + 1)))
+                models.append(hf_model)
+
+            elif len(n_evals) == 1:
+                models = [lf_model, hf_model]
+
+            else:
+                print('Unsupported number of models for ode_pp.')
+                exit()
 
     else:
         print('Unknown model: %r' % model)
         exit()
+
+    if pf_method == 'mc':
+        print('')
+        print('########### MC statistics ###########')
+        print('')
+        print('MC mean:\t\t\t\t\t\t%s' % prior_pf_mc_samples[0, :, :].mean(axis=0))
+        print('MC std:\t\t\t\t\t\t\t%s' % prior_pf_mc_samples[0, :, :].std(axis=0))
+        print('')
+        print('########################################')
+        print('')
 
     if pf_method == 'bmfmc':
         # Setup BMFMC
@@ -269,9 +352,14 @@ def get_prior_prior_pf_samples(n_samples):
 
         # Diagnostics
         bmfmc.print_stats(mc=True)
-        bmfmc.plot_results(mc=True)
-        bmfmc.plot_regression_models()
-        # bmfmc.plot_joint_densities()
+
+        if n_qoi == 1:
+            bmfmc.plot_results(mc=True)
+            bmfmc.plot_regression_models()
+            bmfmc.plot_joint_densities()
+        elif n_qoi == 2:
+            bmfmc.plot_results(mc=True)
+            bmfmc.plot_regression_models()
 
         # Get prior push-forward samples
         prior_pf_samples = bmfmc.get_samples()
@@ -311,8 +399,8 @@ if __name__ == '__main__':
     p_prior_pf = Distribution(prior_pf_samples[-1, :, :], rv_name='$Q$', label='Prior-PF')
 
     # Observed density
-    obs_samples = np.random.randn(n_samples) * obs_scale + obs_loc
-    obs_samples = np.reshape(obs_samples, (n_samples, 1))
+    obs_samples = np.random.randn(n_samples, len(obs_scale)) * obs_scale + obs_loc
+    obs_samples = np.reshape(obs_samples, (n_samples, np.shape(obs_samples)[1]))
     p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
 
     # Posterior
@@ -340,9 +428,6 @@ if __name__ == '__main__':
         for i in range(len(n_evals)):
             print('Evaluating the low-fidelity posteriors %d / %d ...' % (i + 1, len(n_evals)))
             p_prior_pf_lf = Distribution(prior_pf_samples[i, :, :], rv_name='$Q$', label='Prior-PF-LF')
-            obs_samples = np.random.randn(n_samples) * obs_scale + obs_loc
-            obs_samples = np.reshape(obs_samples, (n_samples, 1))
-            p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
             cbayes_post_lf = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_lf)
             cbayes_post_lf.setup_posterior_and_pf()
             cbayes_post_lf.print_stats()
@@ -356,9 +441,6 @@ if __name__ == '__main__':
 
         # Monte Carlo comparison
         p_prior_pf_mc = Distribution(prior_pf_mc_samples, rv_name='$Q$', label='Prior-PF-MC')
-        obs_samples = np.random.randn(n_samples) * obs_scale + obs_loc
-        obs_samples = np.reshape(obs_samples, (n_samples, 1))
-        p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
         cbayes_post_mc = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_mc)
         cbayes_post_mc.setup_posterior_and_pf()
         print('Evaluating the Monte Carlo posterior ...')
@@ -383,6 +465,5 @@ if __name__ == '__main__':
 
     end = time.time()
     print('(Total elapsed time: %fs)' % (end - start))
-
 
 # --------------------------------------------------------------------------- #

@@ -4,6 +4,7 @@ from sklearn import gaussian_process
 from sklearn.gaussian_process.kernels import WhiteKernel, RBF, ConstantKernel, Product, DotProduct
 from sklearn.cluster import KMeans
 from gp_extras.kernels import HeteroscedasticKernel
+import seaborn as sns
 
 import utils
 from Model import Model
@@ -17,7 +18,6 @@ class BMFMC:
     # - n_models: number of models
     # - training_set_selection: strategy for training set selection
     # - regression_model: regression model for the conditionals p(q_l|q_l-1)
-    # - fignum: figure counter for plotting
 
     # Constructor
     def __init__(self, models, training_set_strategy, regression_type):
@@ -28,7 +28,6 @@ class BMFMC:
         self.training_set_strategy = training_set_strategy
         self.regression_type = regression_type
         self.regression_models = []
-        self.fignum = 10
         self.adaptive = True
         self.adaptive_tol = 2.0e-3
 
@@ -112,15 +111,54 @@ class BMFMC:
 
             if len(self.regression_models) == id:
                 # Create a uniform grid across the support of p(q)
-                x_train_linspace = np.linspace(lf_model.model_evals_pred.min(), lf_model.model_evals_pred.max(),
-                                               num=hf_model.n_evals)
-                x_train_linspace = np.reshape(x_train_linspace, (hf_model.n_evals, hf_model.n_qoi))
+
+                if hf_model.n_qoi is 1:
+                    x_train_linspace = np.linspace(lf_model.model_evals_pred[:, 0].min(),
+                                                   lf_model.model_evals_pred[:, 0].max(),
+                                                   num=hf_model.n_evals)
+                    x_train_linspace = np.reshape(x_train_linspace, (hf_model.n_evals, hf_model.n_qoi))
+
+                elif hf_model.n_qoi is 2:
+                    ab_num = int(np.sqrt(hf_model.n_evals))
+                    hf_model.n_evals = ab_num**2
+                    a = np.linspace(lf_model.model_evals_pred[:, 0].min(), lf_model.model_evals_pred[:, 0].max(),
+                                    num=ab_num)
+                    b = np.linspace(lf_model.model_evals_pred[:, 1].min(), lf_model.model_evals_pred[:, 1].max(),
+                                    num=ab_num)
+                    aa, bb = np.meshgrid(a, b)
+                    x_train_linspace = np.reshape(np.vstack([aa, bb]), (2, hf_model.n_evals)).T
+
+                else:
+                    print('Support covering strategy only available for 1 or 2 QoIs.')
+                    exit()
+
             else:
+
                 # Create new points between existing ones
-                sorted_xtrain = np.sort(self.regression_models[id].X_train_, axis=0)
-                diffs = np.diff(sorted_xtrain, n=1, axis=0)
-                diffs = np.reshape(diffs, (np.shape(diffs)[0], hf_model.n_qoi))
-                x_train_linspace = sorted_xtrain[:-1, :] + 0.5 * diffs
+                if hf_model.n_qoi is 1:
+                    sorted_xtrain = np.sort(self.regression_models[id].X_train_, axis=0)
+                    diffs = np.diff(sorted_xtrain, n=1, axis=0)
+                    diffs = np.reshape(diffs, (np.shape(diffs)[0], hf_model.n_qoi))
+                    x_train_linspace = sorted_xtrain[:-1, :] + 0.5 * diffs
+
+                # elif hf_model.n_qoi is 2:
+                #     n_ab = int(np.sqrt(hf_model.n_evals))
+                #     print(self.regression_models[id].X_train_[:, 0])
+                #     x_train_a = np.mean(np.reshape(self.regression_models[id].X_train_[:, 0], (n_ab, n_ab)), axis=0)
+                #     sorted_xtrain_a = np.sort(x_train_a)
+                #     x_train_b = np.mean(np.reshape(self.regression_models[id].X_train_[:, 1], (n_ab, n_ab)), axis=0)
+                #     sorted_xtrain_b = np.sort(x_train_b)
+                #     diffs_a = np.diff(sorted_xtrain_a, n=1, axis=0)
+                #     diffs_b = np.diff(sorted_xtrain_b, n=1, axis=0)
+                #     a = sorted_xtrain_a[:-1] + 0.5 * diffs_a
+                #     b = sorted_xtrain_b[:-1] + 0.5 * diffs_b
+                #     aa, bb = np.meshgrid(a, b)
+                #     x_train_linspace = np.reshape(np.vstack([aa, bb]), (2, np.shape(a)[0]**2)).T
+                #     hf_model.n_evals += np.shape(a)[0]**2
+
+                else:
+                    print('Support covering adaptive strategy only available for 1 QoI.')
+                    exit()
 
             n_train = np.shape(x_train_linspace)[0]
 
@@ -131,16 +169,16 @@ class BMFMC:
 
                 # This is only exact for the lowest fidelity regression model
                 if id == 0:
-                    idx = (np.abs(lf_model.model_evals_pred - x_train_linspace[i, :])).argmin()
-                    x_train[i] = lf_model.model_evals_pred[idx]
+                    idx = (np.linalg.norm(lf_model.model_evals_pred - x_train_linspace[i, :], axis=1, ord=1)).argmin()
+                    x_train[i, :] = lf_model.model_evals_pred[idx, :]
 
                 # For any other regression model, finding the correct x,y pair is a noisy task.
                 # We use the mean predictions of the GP to do that.
                 else:
                     regression_model = self.regression_models[id - 1]
                     mu = regression_model.predict(self.models[id - 1].model_evals_pred, return_std=False)
-                    idx = (np.abs(mu - x_train_linspace[i, :])).argmin()
-                    x_train[i] = lf_model.eval_fun(lf_model.rv_samples_pred[idx, :])
+                    idx = (np.linalg.norm(mu - x_train_linspace[i, :], axis=1, ord=1)).argmin()
+                    x_train[i, :] = lf_model.eval_fun(lf_model.rv_samples_pred[idx, :])
 
                 hf_rv_samples[i, :] = lf_model.rv_samples_pred[idx, :]
 
@@ -161,7 +199,7 @@ class BMFMC:
             if id > 0:
                 x_train = np.zeros((hf_model.n_evals, lf_model.n_qoi))
                 for i in range(hf_model.n_evals):
-                    x_train[i] = lf_model.eval_fun(lf_model.rv_samples_pred[indices[i], :])
+                    x_train[i, :] = lf_model.eval_fun(lf_model.rv_samples_pred[indices[i], :])
             elif id == 0:
                 x_train = lf_model.model_evals_pred[indices, :]
             else:
@@ -200,9 +238,9 @@ class BMFMC:
             mu, sigma = regression_model.predict(x_pred, return_std=True)
 
             # Generate low-fidelity samples from the predictions
-            hf_model_evals_pred = np.zeros((mu.shape[0],))
+            hf_model_evals_pred = np.zeros((mu.shape[0], mu.shape[1]))
             for i in range(mu.shape[0]):
-                hf_model_evals_pred[i] = mu[i] + sigma[i] * np.random.randn()
+                hf_model_evals_pred[i] = mu[i, :] + sigma[i] * np.random.randn(1, mu.shape[1])
 
         elif self.regression_type == 'heteroscedastic_gaussian_process':
 
@@ -218,9 +256,13 @@ class BMFMC:
             mu, sigma = regression_model.predict(x_pred, return_std=True)
 
             # Generate low-fidelity samples from the predictions
-            hf_model_evals_pred = np.zeros((mu.shape[0],))
+            hf_model_evals_pred = np.zeros((mu.shape[0], mu.shape[1]))
             for i in range(mu.shape[0]):
-                hf_model_evals_pred[i] = mu[i] + sigma[i] * np.random.randn()
+                hf_model_evals_pred[i] = mu[i, :] + sigma[i] * np.random.randn(1, mu.shape[1])
+
+        elif self.regression_type == 'bayesian_regression':
+            print('Not implemented yet.')
+            exit()
 
         else:
             print('Unknown regression model.')
@@ -285,8 +327,8 @@ class BMFMC:
         print('########### BMFMC statistics ###########')
         print('')
         if mc and self.mc_model != 0:
-            print('MC mean:\t\t\t\t\t\t%f' % self.mc_model.distribution.mean())
-            print('MC std:\t\t\t\t\t\t\t%f' % self.mc_model.distribution.std())
+            print('MC mean:\t\t\t\t\t\t%s' % self.mc_model.distribution.mean())
+            print('MC std:\t\t\t\t\t\t\t%s' % self.mc_model.distribution.std())
             print('')
             print('MC-BMFMC KL:\t\t\t\t\t%f' % self.mc_model.distribution.calculate_kl_divergence(
                 self.models[-1].distribution))
@@ -294,18 +336,18 @@ class BMFMC:
             print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
             exit()
         print('')
-        print('Low-fidelity mean:\t\t\t\t%f' % self.models[0].distribution.mean())
-        print('Low-fidelity std:\t\t\t\t%f' % self.models[0].distribution.std())
+        print('Low-fidelity mean:\t\t\t\t%s' % self.models[0].distribution.mean())
+        print('Low-fidelity std:\t\t\t\t%s' % self.models[0].distribution.std())
         print('')
         for i in range(self.n_models - 2):
-            print('Mid-%d-fidelity mean:\t\t\t%f' % (int(i + 1), self.models[i + 1].distribution.mean()))
-            print('Mid-%d-fidelity std:\t\t\t\t%f' % (int(i + 1), self.models[i + 1].distribution.std()))
+            print('Mid-%d-fidelity mean:\t\t\t%s' % (int(i + 1), self.models[i + 1].distribution.mean()))
+            print('Mid-%d-fidelity std:\t\t\t\t%s' % (int(i + 1), self.models[i + 1].distribution.std()))
             print('')
             kl = self.models[i].distribution.calculate_kl_divergence(self.models[i + 1].distribution)
             print('Relative information gain:\t\t%f' % kl)
             print('')
-        print('High-fidelity mean:\t\t\t\t%f' % self.models[-1].distribution.mean())
-        print('High-fidelity std:\t\t\t\t%f' % self.models[-1].distribution.std())
+        print('High-fidelity mean:\t\t\t\t%s' % self.models[-1].distribution.mean())
+        print('High-fidelity std:\t\t\t\t%s' % self.models[-1].distribution.std())
         print('')
         kl = self.models[-2].distribution.calculate_kl_divergence(self.models[-1].distribution)
         print('Relative information gain:\t\t%f' % kl)
@@ -319,25 +361,71 @@ class BMFMC:
     # Plot BMFMC distributions
     def plot_results(self, mc=False):
 
-        # Determine bounds
-        xmin = np.min([np.min(self.models[-1].model_evals_pred), np.min(self.models[0].model_evals_pred)])
-        xmax = np.max([np.max(self.models[-1].model_evals_pred), np.max(self.models[0].model_evals_pred)])
+        if self.models[0].n_qoi == 1:
+            # Determine bounds
+            xmin = np.min([np.min(self.models[-1].model_evals_pred), np.min(self.models[0].model_evals_pred)])
+            xmax = np.max([np.max(self.models[-1].model_evals_pred), np.max(self.models[0].model_evals_pred)])
 
-        for i in range(self.n_models):
-            # Plot
-            color = 'C' + str(i)
-            self.models[i].distribution.plot_kde(fignum=self.fignum, color=color, xmin=xmin, xmax=xmax,
-                                                 title='BMFMC - approximate distributions')
+            for i in range(self.n_models):
+                # Plot
+                color = 'C' + str(i)
+                self.models[i].distribution.plot_kde(fignum=1, color=color, xmin=xmin, xmax=xmax,
+                                                     title='BMFMC - approximate distributions')
 
-        if mc and self.mc_model is not None:
-            self.mc_model.distribution.plot_kde(fignum=self.fignum, color='k', linestyle='--',
-                                                xmin=xmin, xmax=xmax, title='BMFMC - approximate distributions')
-        elif mc and self.mc_model is None:
-            print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
+            if mc and self.mc_model is not None:
+                self.mc_model.distribution.plot_kde(fignum=1, color='k', linestyle='--',
+                                                    xmin=xmin, xmax=xmax, title='BMFMC - approximate distributions')
+            elif mc and self.mc_model is None:
+                print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
+                exit()
+
+            plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
+            plt.clf()
+
+        elif self.models[0].n_qoi == 2:
+
+            sns.kdeplot(self.models[0].distribution.samples[:, 0], self.models[0].distribution.samples[:, 1],
+                        shade=True, shade_lowest=False, cmap='Blues')
+            sns.kdeplot(self.models[-1].distribution.samples[:, 0], self.models[-1].distribution.samples[:, 1],
+                        shade=True, shade_lowest=False, cmap='Reds')
+
+            if mc and self.mc_model is not None:
+                sns.kdeplot(self.mc_model.distribution.samples[:, 0], self.mc_model.distribution.samples[:, 1],
+                            cmap='Greys', alpha=1.0)
+            elif mc and self.mc_model is None:
+                print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
+                exit()
+
+            plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
+            xmin, xmax = plt.xlim()
+            ymin, ymax = plt.ylim()
+            plt.clf()
+
+            self.models[0].distribution.plot_kde()
+            plt.xlim([xmin, xmax])
+            plt.ylim([ymin, ymax])
+            plt.gcf().savefig('pngout/bmfmc_lf.png', dpi=300)
+            plt.clf()
+
+            self.models[-1].distribution.plot_kde()
+            plt.xlim([xmin, xmax])
+            plt.ylim([ymin, ymax])
+            plt.gcf().savefig('pngout/bmfmc_hf.png', dpi=300)
+            plt.clf()
+
+            if mc and self.mc_model is not None:
+                self.mc_model.distribution.plot_kde()
+                plt.xlim([xmin, xmax])
+                plt.ylim([ymin, ymax])
+                plt.gcf().savefig('pngout/bmfmc_mc.png', dpi=300)
+                plt.clf()
+            elif mc and self.mc_model is None:
+                print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
+                exit()
+
+        else:
+            print('BMFMC plotting only available for 1 and 2 QoIs.')
             exit()
-
-        plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
-        self.fignum += 1
 
     # Plot the regression models
     def plot_regression_models(self):
@@ -359,16 +447,29 @@ class BMFMC:
             y_pred = np.squeeze(mu[sort_indices])
             sigma = np.squeeze(sigma[sort_indices])
 
-            utils.plot_1d_conf(x_pred, y_pred, sigma, num=self.fignum)
-            utils.plot_1d_data(x_train, y_train, marker='*', linestyle='', markersize=5, color='k', num=self.fignum,
-                               label='Training', title='BMFMC - regression model', xlabel=lf_model.rv_name,
-                               ylabel=hf_model.rv_name)
+            if hf_model.n_qoi == 1:
+                utils.plot_1d_conf(x_pred, y_pred, sigma)
+                utils.plot_1d_data(x_train, y_train, marker='*', linestyle='', markersize=5, color='k',
+                                   label='Training', title='BMFMC - regression model', xlabel=lf_model.rv_name,
+                                   ylabel=hf_model.rv_name)
+            elif hf_model.n_qoi == 2:
+                sns.kdeplot(lf_model.distribution.samples[:, 0], lf_model.distribution.samples[:, 1],
+                            shade=True, shade_lowest=False, cmap='Blues')
+                sns.kdeplot(hf_model.distribution.samples[:, 0], hf_model.distribution.samples[:, 1],
+                            shade=False, shade_lowest=False, cmap='Reds')
+                colors = range(np.shape(x_train)[0])
+                plt.scatter(x_train[:, 0], x_train[:, 1], c=colors, marker='o', s=30)
+                plt.scatter(y_train[:, 0], y_train[:, 1], c=colors, marker='*', s=30)
+                for k in range(np.shape(x_train)[0]):
+                    plt.plot([x_train[k, 0], y_train[k, 0]], [x_train[k, 1], y_train[k, 1]], linestyle='--', color='k',
+                             linewidth=1)
 
             if self.n_models > 2:
                 plt.gcf().savefig('pngout/bmfmc_regression_model_' + str(i + 1) + '.png', dpi=300)
             else:
                 plt.gcf().savefig('pngout/bmfmc_regression_model.png', dpi=300)
-            self.fignum += 1
+
+            plt.clf()
 
     # Plot the approximate joint densities
     def plot_joint_densities(self):
@@ -377,15 +478,13 @@ class BMFMC:
             lf_model = self.models[i]
             hf_model = self.models[i + 1]
 
-            utils.plot_2d_contour(samples_x=np.squeeze(lf_model.model_evals_pred),
-                                  samples_y=np.squeeze(hf_model.model_evals_pred),
-                                  num=self.fignum,
-                                  title='Approximate joint $p($' + lf_model.rv_name + '$,$' + hf_model.rv_name + '$)$',
-                                  xlabel=lf_model.rv_name,
-                                  ylabel=hf_model.rv_name)
+            samples = np.vstack([np.squeeze(lf_model.model_evals_pred), np.squeeze(hf_model.model_evals_pred)])
+            utils.plot_2d_kde(samples=samples.T,
+                              xlabel=lf_model.rv_name, ylabel=hf_model.rv_name)
 
             if self.n_models > 2:
                 plt.gcf().savefig('pngout/bmfmc_joint_dist_' + str(i + 1) + '.png', dpi=300)
             else:
                 plt.gcf().savefig('pngout/bmfmc_joint_dist.png', dpi=300)
-            self.fignum += 1
+
+            plt.clf()

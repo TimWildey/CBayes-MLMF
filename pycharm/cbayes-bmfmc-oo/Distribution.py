@@ -27,8 +27,8 @@ class Distribution:
         self.rv_transform = rv_transform
         self.kde_evals = None
 
-        if self.n_dim < 3 and kde:
-            self.kernel_density = gkde(np.squeeze(samples))
+        if self.n_dim < 4 and kde:
+            self.kernel_density = gkde(np.squeeze(samples).T)
         elif kde:
             print('Attempting KDE in %d dimensions. Aborting.' % self.n_dim)
             exit()
@@ -58,7 +58,7 @@ class Distribution:
             print('No kernel density available. Check your distribution.')
             exit()
         if self.kde_evals is None:
-            self.kde_evals = self.kernel_density(np.squeeze(self.samples))
+            self.kde_evals = self.kernel_density(np.squeeze(self.samples).T)
         return self.kde_evals
 
     # Estimate the KL divergence between q and p
@@ -66,7 +66,7 @@ class Distribution:
     def calculate_kl_divergence(self, p):
         q = self.eval_kernel_density()
         q += 1e-10
-        p = p.kernel_density(np.squeeze(self.samples))
+        p = p.kernel_density(np.squeeze(self.samples).T)
         p += 1e-10
         kl = np.mean(np.log(np.divide(q, p)))
         if kl < 0.0:
@@ -74,20 +74,19 @@ class Distribution:
         return kl
 
     # Plot the KDE density
-    def plot_kde(self, fignum, color='C0', linestyle='-', xmin=0.0, xmax=1.0, title=''):
+    def plot_kde(self, fignum=1, color='C0', linestyle='-', xmin=0.0, xmax=1.0, title=''):
         if self.n_dim == 1:
             utils.plot_1d_kde(qkde=self.kernel_density, xmin=xmin, xmax=xmax, label=self.label, linestyle=linestyle,
                               num=fignum, xlabel=self.rv_name, ylabel='$p($' + self.rv_name + '$)$', color=color,
                               title=title)
         elif self.n_dim == 2:
-            print('2D KDE plots not implemented yet.')
-            exit()
+            utils.plot_2d_kde(samples=self.samples, num=fignum)
         else:
             print('KDE plots are only available for 1 and 2 dimensions.')
             exit()
 
     # Plot the sample histogram
-    def plot_histogram(self, fignum):
+    def plot_histogram(self, fignum=1):
         if self.n_dim == 1:
             utils.plot_1d_hist(samples=self.samples, num=fignum, xlabel=self.rv_name,
                                ylabel='$p($' + self.rv_name + '$)$')
