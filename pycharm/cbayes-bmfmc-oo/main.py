@@ -1,8 +1,13 @@
 # Standard stuff
 import numpy as np
 import os
+import sys
 import time
 import matplotlib.pyplot as plt
+
+# Add relevant folders to path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/models')
 
 # Model stuff
 import lambda_p
@@ -35,12 +40,12 @@ pf_method = 'bmfmc'
 # The number of models will thus be len(n_evals) + 1
 n_evals = [200, 100, 50, 20, 10]
 # n_evals = [100, 50, 20]
-n_evals = [100]
+n_evals = [20]
 
 # Training set selection strategy (support_covering, support_covering_adaptive, sampling, sampling_adaptive)
-training_set_strategy = 'sampling'
+training_set_strategy = 'support_covering'
 
-# Regression model type (gaussian_process, heteroscedastic_gaussian_process, bayesian_regression)
+# Regression model type (gaussian_process, heteroscedastic_gaussian_process)
 regression_type = 'heteroscedastic_gaussian_process'
 
 
@@ -49,18 +54,15 @@ regression_type = 'heteroscedastic_gaussian_process'
 
 # Framework
 # todo: (!!) check how to deal with the case where one has fixed evaluation points --> training_set_strategy: fixed
-# todo: (!!) compare BMFMC and MC L1 error as a benchmark
 # todo: (!) enhance plotting: https://www.safaribooksonline.com/library/view/python-data-science/9781491912126/ch04.html
 
 # Distributions
 # todo: (!) implement transformations of random variables to operate in unconstrained probability space only
 
 # Regression
-# todo: (!) check out http://scikit-learn.org/stable/auto_examples/linear_model/plot_bayesian_ridge.html#sphx-glr-auto-examples-linear-model-plot-bayesian-ridge-py
 # todo: (!) think about other regression models
 
 # Adaptive training
-# todo: (!!) adaptive sampling using the GP predictive uncertainty --> training_set_strategy: sampling_gp_adaptive
 # todo: (!) different options how to choose samples: uniform / LHS / sparse grids
 
 

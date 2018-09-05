@@ -133,28 +133,12 @@ class BMFMC:
                     exit()
 
             else:
-
                 # Create new points between existing ones
                 if hf_model.n_qoi is 1:
                     sorted_xtrain = np.sort(self.regression_models[id].X_train_, axis=0)
                     diffs = np.diff(sorted_xtrain, n=1, axis=0)
                     diffs = np.reshape(diffs, (np.shape(diffs)[0], hf_model.n_qoi))
                     x_train_linspace = sorted_xtrain[:-1, :] + 0.5 * diffs
-
-                # elif hf_model.n_qoi is 2:
-                #     n_ab = int(np.sqrt(hf_model.n_evals))
-                #     print(self.regression_models[id].X_train_[:, 0])
-                #     x_train_a = np.mean(np.reshape(self.regression_models[id].X_train_[:, 0], (n_ab, n_ab)), axis=0)
-                #     sorted_xtrain_a = np.sort(x_train_a)
-                #     x_train_b = np.mean(np.reshape(self.regression_models[id].X_train_[:, 1], (n_ab, n_ab)), axis=0)
-                #     sorted_xtrain_b = np.sort(x_train_b)
-                #     diffs_a = np.diff(sorted_xtrain_a, n=1, axis=0)
-                #     diffs_b = np.diff(sorted_xtrain_b, n=1, axis=0)
-                #     a = sorted_xtrain_a[:-1] + 0.5 * diffs_a
-                #     b = sorted_xtrain_b[:-1] + 0.5 * diffs_b
-                #     aa, bb = np.meshgrid(a, b)
-                #     x_train_linspace = np.reshape(np.vstack([aa, bb]), (2, np.shape(a)[0]**2)).T
-                #     hf_model.n_evals += np.shape(a)[0]**2
 
                 else:
                     print('Support covering adaptive strategy only available for 1 QoI.')
@@ -259,10 +243,6 @@ class BMFMC:
             hf_model_evals_pred = np.zeros((mu.shape[0], mu.shape[1]))
             for i in range(mu.shape[0]):
                 hf_model_evals_pred[i] = mu[i, :] + sigma[i] * np.random.randn(1, mu.shape[1])
-
-        elif self.regression_type == 'bayesian_regression':
-            print('Not implemented yet.')
-            exit()
 
         else:
             print('Unknown regression model.')
