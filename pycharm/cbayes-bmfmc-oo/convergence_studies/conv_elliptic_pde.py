@@ -28,7 +28,12 @@ regression_type = 'heteroscedastic_gaussian_process'
 
 if __name__ == '__main__':
 
-    n_evals_all = [[5], [10], [15], [20], [30], [50], [100], [200], [300], [500]]
+    n_evals_mc = np.logspace(np.log10(50), np.log10(2000), 20)
+    n_evals_mc = np.round(n_evals_mc).astype(int)
+    n_evals_bmfmc = np.logspace(np.log10(20), np.log10(500), 10)
+    n_evals_bmfmc = np.round(n_evals_bmfmc).astype(int)
+    n_evals_all = n_evals_mc.tolist() + list(set(n_evals_bmfmc.tolist()) - set(n_evals_mc.tolist()))
+    n_evals_all.sort()
 
     # elliptic_pde model
     n_qoi = 1
@@ -70,38 +75,50 @@ if __name__ == '__main__':
     p_obs_evals = p_obs.kernel_density(ref_prior_pf_samples)
     ref_p_prior_pf_evals = ref_p_prior_pf.kernel_density(ref_prior_pf_samples)
 
-    # kl
+    # Reference KL between prior and posterior
     cbayes_post = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=ref_p_prior_pf)
     cbayes_post.setup_posterior_and_pf()
     ref_kl = cbayes_post.get_prior_post_kl()
 
     # -------------- 1 HF
 
-    errors_1hf = []
-    kls_1hf = []
-    for idx, n_evals in enumerate(n_evals_all):
-        print('\nCalculating MC model %d / %d ...' % (idx + 1, len(n_evals_all)))
+    errors_post_1hf = []
+    errors_prior_pf_1hf = []
+    kls_post_1hf = []
+    kls_prior_pf_1hf = []
+    for idx, n_evals in enumerate(n_evals_mc):
+        print('\nCalculating MC model %d / %d ...' % (idx + 1, len(n_evals_mc)))
         prior_pf_samples_tmp = prior_pf_samples[np.random.choice(range(prior_pf_samples.shape[0]),
-                                                                 size=n_evals[0], replace=False), :]
+                                                                 size=n_evals, replace=False), :]
         p_prior_pf = Distribution(prior_pf_samples_tmp, rv_name='$Q$', label='Prior-PF')
 
-        # l1 error
-        l1_error = 1/n_samples * np.linalg.norm(
-            p_obs_evals / ref_p_prior_pf_evals - p_obs_evals / p_prior_pf.kernel_density(ref_prior_pf_samples), 1)
-        errors_1hf.append(l1_error)
+        # l1 error between posterior and reference posterior
+        l1_error_post = 1 / n_samples * np.linalg.norm(
+            p_obs_evals / ref_p_prior_pf_evals - p_obs_evals / p_prior_pf.kernel_density(ref_prior_pf_samples), ord=1)
+        errors_post_1hf.append(l1_error_post)
 
-        # kl
+        # l1 error between prior push-forward and reference push-forward
+        l1_error_prior_pf = 1 / n_samples * np.linalg.norm(
+            ref_p_prior_pf_evals - p_prior_pf.kernel_density(ref_prior_pf_samples), ord=1)
+        errors_prior_pf_1hf.append(l1_error_prior_pf)
+
+        # kl between prior and posterior
         p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
         cbayes_post = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf)
         cbayes_post.setup_posterior_and_pf()
-        kls_1hf.append(cbayes_post.get_prior_post_kl())
+        kls_post_1hf.append(cbayes_post.get_prior_post_kl())
+
+        # kl between prior push-forward and reference push-forward
+        kls_prior_pf_1hf.append(ref_p_prior_pf.calculate_kl_divergence(p_prior_pf))
 
     # -------------- 1 HF, 1 LF
 
-    errors_1hf_1lf = []
-    kls_1hf_1lf = []
-    for idx, n_evals in enumerate(n_evals_all):
-        print('\nCalculating BMFMC model %d / %d ...' % (idx + 1, len(n_evals_all)))
+    errors_prior_pf_1hf_1lf = []
+    errors_post_1hf_1lf = []
+    kls_post_1hf_1lf = []
+    kls_prior_pf_1hf_1lf = []
+    for idx, n_evals in enumerate(n_evals_bmfmc):
+        print('\nCalculating BMFMC model %d / %d ...' % (idx + 1, len(n_evals_bmfmc)))
 
         # Construct low-fi model
         X_train = lam[0:round(split * lam.shape[0])]
@@ -118,7 +135,7 @@ if __name__ == '__main__':
         hf_samples = prior_pf_samples[indices, :]
 
         hf_model = Model(eval_fun=lambda x: elliptic_pde.find_xy_pair(x, prior_samples, hf_samples),
-                         n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
+                         n_evals=n_evals, n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
         models = [lf_model, hf_model]
 
@@ -131,36 +148,60 @@ if __name__ == '__main__':
         prior_pf_samples_tmp = bmfmc.get_samples()[-1, :, :]
         p_prior_pf = Distribution(prior_pf_samples_tmp, rv_name='$Q$', label='Prior-PF')
 
-        # l1 error
-        l1_error = 1 / n_samples * np.linalg.norm(
-            p_obs_evals / ref_p_prior_pf_evals - p_obs_evals / p_prior_pf.kernel_density(ref_prior_pf_samples), 1)
-        errors_1hf_1lf.append(l1_error)
+        # l1 error between prior push-forward and reference push-forward
+        l1_error_prior_pf = 1 / n_samples * np.linalg.norm(
+            ref_p_prior_pf_evals - p_prior_pf.kernel_density(ref_prior_pf_samples), ord=1)
+        errors_prior_pf_1hf_1lf.append(l1_error_prior_pf)
 
-        # kl
+        # l1 error between posterior and reference posterior
+        l1_error_post = 1 / n_samples * np.linalg.norm(
+            p_obs_evals / ref_p_prior_pf_evals - p_obs_evals / p_prior_pf.kernel_density(ref_prior_pf_samples), ord=1)
+        errors_post_1hf_1lf.append(l1_error_post)
+
+        # kl between prior and posterior
         p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
         cbayes_post = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf)
         cbayes_post.setup_posterior_and_pf()
-        kls_1hf_1lf.append(cbayes_post.get_prior_post_kl())
+        kls_post_1hf_1lf.append(cbayes_post.get_prior_post_kl())
+
+        # kl between prior push-forward and reference push-forward
+        kls_prior_pf_1hf_1lf.append(ref_p_prior_pf.calculate_kl_divergence(p_prior_pf))
 
     # Plots
     plt.figure()
-    plt.semilogx(np.squeeze(n_evals_all), errors_1hf, '-o', label='1 HF')
-    plt.semilogx(np.squeeze(n_evals_all), errors_1hf_1lf, '-o', label='1 HF, 1 LF')
+    plt.semilogx(np.squeeze(n_evals_mc), errors_post_1hf, '-o', label='1 HF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), errors_post_1hf_1lf, '-o', label='1 HF, 1 LF')
     plt.semilogx(np.squeeze(n_evals_all), np.zeros((len(n_evals_all))), 'k--')
     plt.xlabel('No. high-fidelity samples')
     plt.ylabel('L1-error in the posterior')
-    plt.ylim([-0.1, 1.0])
     plt.legend(loc='upper right')
-    plt.gcf().savefig('convergence_studies/l1_error_conv_elliptic_pde.png', dpi=300)
+    plt.gcf().savefig('elliptic_pde_l1_error_post_conv.png', dpi=300)
 
     plt.figure()
-    plt.semilogx(np.squeeze(n_evals_all), kls_1hf, '-o', label='1 HF')
-    plt.semilogx(np.squeeze(n_evals_all), kls_1hf_1lf, '-o', label='1 HF, 1 LF')
+    plt.semilogx(np.squeeze(n_evals_mc), kls_post_1hf, '-o', label='1 HF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), kls_post_1hf_1lf, '-o', label='1 HF, 1 LF')
     plt.semilogx(np.squeeze(n_evals_all), ref_kl * np.ones((len(n_evals_all))), 'k--')
     plt.xlabel('No. high-fidelity samples')
     plt.ylabel('Post-prior KL')
-    # plt.ylim([-0.1, 1.0])
     plt.legend(loc='upper right')
-    plt.gcf().savefig('convergence_studies/post_prior_kls_elliptic_pde.png', dpi=300)
+    plt.gcf().savefig('elliptic_pde_post_prior_kls.png', dpi=300)
+
+    plt.figure()
+    plt.semilogx(np.squeeze(n_evals_mc), errors_prior_pf_1hf, '-o', label='1 HF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), errors_prior_pf_1hf_1lf, '-o', label='1 HF, 1 LF')
+    plt.semilogx(np.squeeze(n_evals_all), np.zeros((len(n_evals_all))), 'k--')
+    plt.xlabel('No. high-fidelity samples')
+    plt.ylabel('L1-error in the prior push-forward')
+    plt.legend(loc='upper right')
+    plt.gcf().savefig('elliptic_pde_l1_error_prior_pf_conv.png', dpi=300)
+
+    plt.figure()
+    plt.semilogx(np.squeeze(n_evals_mc), kls_prior_pf_1hf, '-o', label='1 HF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), kls_prior_pf_1hf_1lf, '-o', label='1 HF, 1 LF')
+    plt.semilogx(np.squeeze(n_evals_all), np.zeros((len(n_evals_all))), 'k--')
+    plt.xlabel('No. high-fidelity samples')
+    plt.ylabel('Prior-PF KL')
+    plt.legend(loc='upper right')
+    plt.gcf().savefig('elliptic_pde_prior_pf_kls.png', dpi=300)
 
 # --------------------------------------------------------------------------- #

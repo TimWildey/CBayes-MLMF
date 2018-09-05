@@ -9,6 +9,7 @@ import lambda_p
 from Distribution import Distribution
 from Model import Model
 from BMFMC import BMFMC
+from CBayes import CBayesPosterior
 
 # ------------------------------------------------- Config - General -------- #
 
@@ -27,7 +28,12 @@ regression_type = 'gaussian_process'
 
 if __name__ == '__main__':
 
-    n_evals_all = [[5], [10], [15], [20], [30], [50], [100], [200], [300], [500]]
+    n_evals_mc = np.logspace(np.log10(50), np.log10(2000), 20)
+    n_evals_mc = np.round(n_evals_mc).astype(int)
+    n_evals_bmfmc = np.logspace(np.log10(5), np.log10(200), 10)
+    n_evals_bmfmc = np.round(n_evals_bmfmc).astype(int)
+    n_evals_all = n_evals_mc.tolist() + list(set(n_evals_bmfmc.tolist()) - set(n_evals_mc.tolist()))
+    n_evals_all.sort()
 
     # lambda_p model
     n_qoi = 1
@@ -62,28 +68,53 @@ if __name__ == '__main__':
     p_obs_evals = p_obs.kernel_density(ref_prior_pf_samples)
     ref_p_prior_pf_evals = ref_p_prior_pf.kernel_density(ref_prior_pf_samples)
 
+    # Reference KL between prior and posterior
+    cbayes_post = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=ref_p_prior_pf)
+    cbayes_post.setup_posterior_and_pf()
+    ref_kl = cbayes_post.get_prior_post_kl()
+
     # -------------- 1 HF
 
-    errors_1hf = []
-    for idx, n_evals in enumerate(n_evals_all):
-        print('\nCalculating MC model %d / %d ...' % (idx + 1, len(n_evals_all)))
-        model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), rv_samples=prior_samples[0:n_evals[0], :],
-                      n_evals=n_evals[0], n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
+    errors_post_1hf = []
+    errors_prior_pf_1hf = []
+    kls_post_1hf = []
+    kls_prior_pf_1hf = []
+    for idx, n_evals in enumerate(n_evals_mc):
+        print('\nCalculating MC model %d / %d ...' % (idx + 1, len(n_evals_mc)))
+        model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), rv_samples=prior_samples[0:n_evals, :],
+                      n_evals=n_evals, n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
         # Brute force Monte Carlo
         prior_pf_samples = model.evaluate()
         p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-        # l1 error
-        l1_error = 1 / n_samples * np.linalg.norm(
-            p_obs_evals / ref_p_prior_pf_evals - p_obs_evals / p_prior_pf.kernel_density(ref_prior_pf_samples), 1)
-        errors_1hf.append(l1_error)
+        # l1 error between posterior and reference posterior
+        l1_error_post = 1 / n_samples * np.linalg.norm(
+            p_obs_evals / ref_p_prior_pf_evals - p_obs_evals / p_prior_pf.kernel_density(ref_prior_pf_samples), ord=1)
+        errors_post_1hf.append(l1_error_post)
+
+        # l1 error between prior push-forward and reference push-forward
+        l1_error_prior_pf = 1 / n_samples * np.linalg.norm(
+            ref_p_prior_pf_evals - p_prior_pf.kernel_density(ref_prior_pf_samples), ord=1)
+        errors_prior_pf_1hf.append(l1_error_prior_pf)
+
+        # kl between prior and posterior
+        p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
+        cbayes_post = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf)
+        cbayes_post.setup_posterior_and_pf()
+        kls_post_1hf.append(cbayes_post.get_prior_post_kl())
+
+        # kl between prior push-forward and reference push-forward
+        kls_prior_pf_1hf.append(ref_p_prior_pf.calculate_kl_divergence(p_prior_pf))
 
     # -------------- 1 HF, 1 LF
 
-    errors_1hf_1lf = []
-    for idx, n_evals in enumerate(n_evals_all):
-        print('\nCalculating BMFMC model %d / %d ...' % (idx + 1, len(n_evals_all)))
+    errors_prior_pf_1hf_1lf = []
+    errors_post_1hf_1lf = []
+    kls_post_1hf_1lf = []
+    kls_prior_pf_1hf_1lf = []
+    for idx, n_evals in enumerate(n_evals_bmfmc):
+        print('\nCalculating BMFMC model %d / %d ...' % (idx + 1, len(n_evals_bmfmc)))
 
         # Create a low-fidelity model
         lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_lf), rv_samples=prior_samples,
@@ -91,7 +122,7 @@ if __name__ == '__main__':
                          rv_name='$q_0$', label='Low-fidelity')
 
         # Create a high-fidelity model
-        hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), n_evals=n_evals[-1],
+        hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), n_evals=n_evals,
                          n_qoi=n_qoi,
                          rv_name='$Q$', label='High-fidelity')
 
@@ -106,18 +137,34 @@ if __name__ == '__main__':
         prior_pf_samples = bmfmc.get_samples()[-1, :, :]
         p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-        # l1 error
-        l1_error = 1 / n_samples * np.linalg.norm(
-            p_obs_evals / ref_p_prior_pf_evals - p_obs_evals / p_prior_pf.kernel_density(ref_prior_pf_samples), 1)
-        errors_1hf_1lf.append(l1_error)
+        # l1 error between prior push-forward and reference push-forward
+        l1_error_prior_pf = 1 / n_samples * np.linalg.norm(
+            ref_p_prior_pf_evals - p_prior_pf.kernel_density(ref_prior_pf_samples), ord=1)
+        errors_prior_pf_1hf_1lf.append(l1_error_prior_pf)
+
+        # l1 error between posterior and reference posterior
+        l1_error_post = 1 / n_samples * np.linalg.norm(
+            p_obs_evals / ref_p_prior_pf_evals - p_obs_evals / p_prior_pf.kernel_density(ref_prior_pf_samples), ord=1)
+        errors_post_1hf_1lf.append(l1_error_post)
+
+        # kl between prior and posterior
+        p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
+        cbayes_post = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf)
+        cbayes_post.setup_posterior_and_pf()
+        kls_post_1hf_1lf.append(cbayes_post.get_prior_post_kl())
+
+        # kl between prior push-forward and reference push-forward
+        kls_prior_pf_1hf_1lf.append(ref_p_prior_pf.calculate_kl_divergence(p_prior_pf))
 
     # -------------- 1 HF, 2 LF
 
-    n_low = n_evals_all[-1][0]
-    errors_1hf_2lf = []
-    for idx, n_evals in enumerate(n_evals_all):
-        n_evals = [n_low, n_evals[0]]
-        print('\nCalculating BMFMC multi-model %d / %d ...' % (idx + 1, len(n_evals_all)))
+    errors_prior_pf_1hf_2lf = []
+    errors_post_1hf_2lf = []
+    kls_post_1hf_2lf = []
+    kls_prior_pf_1hf_2lf = []
+    for idx, n_evals in enumerate(n_evals_bmfmc):
+        n_evals = [4*n_evals, n_evals]
+        print('\nCalculating BMFMC multi-model %d / %d ...' % (idx + 1, len(n_evals_bmfmc)))
 
         # Create a low-fidelity model
         lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_lf), rv_samples=prior_samples,
@@ -143,21 +190,64 @@ if __name__ == '__main__':
         prior_pf_samples = bmfmc.get_samples()[-1, :, :]
         p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-        # l1 error
-        l1_error = 1 / n_samples * np.linalg.norm(
-            p_obs_evals / ref_p_prior_pf_evals - p_obs_evals / p_prior_pf.kernel_density(ref_prior_pf_samples), 1)
-        errors_1hf_2lf.append(l1_error)
+        # l1 error between prior push-forward and reference push-forward
+        l1_error_prior_pf = 1 / n_samples * np.linalg.norm(
+            ref_p_prior_pf_evals - p_prior_pf.kernel_density(ref_prior_pf_samples), ord=1)
+        errors_prior_pf_1hf_2lf.append(l1_error_prior_pf)
 
-    # Plot
+        # l1 error between posterior and reference posterior
+        l1_error_post = 1 / n_samples * np.linalg.norm(
+            p_obs_evals / ref_p_prior_pf_evals - p_obs_evals / p_prior_pf.kernel_density(ref_prior_pf_samples), ord=1)
+        errors_post_1hf_2lf.append(l1_error_post)
+
+        # kl between prior and posterior
+        p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
+        cbayes_post = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf)
+        cbayes_post.setup_posterior_and_pf()
+        kls_post_1hf_2lf.append(cbayes_post.get_prior_post_kl())
+
+        # kl between prior push-forward and reference push-forward
+        kls_prior_pf_1hf_2lf.append(ref_p_prior_pf.calculate_kl_divergence(p_prior_pf))
+
+    # Plots
     plt.figure()
-    plt.semilogx(np.squeeze(n_evals_all), errors_1hf, '-o', label='1 HF')
-    plt.semilogx(np.squeeze(n_evals_all), errors_1hf_1lf, '-o', label='1 HF, 1 LF')
-    plt.semilogx(np.squeeze(n_evals_all), errors_1hf_2lf, '-o', label='1 HF, 2 LF')
+    plt.semilogx(np.squeeze(n_evals_mc), errors_post_1hf, '-o', label='1 HF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), errors_post_1hf_1lf, '-o', label='1 HF, 1 LF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), errors_post_1hf_2lf, '-o', label='1 HF, 2 LF')
     plt.semilogx(np.squeeze(n_evals_all), np.zeros((len(n_evals_all))), 'k--')
     plt.xlabel('No. high-fidelity samples')
     plt.ylabel('L1-error in the posterior')
-    plt.ylim([-0.1, 1.0])
     plt.legend(loc='upper right')
-    plt.gcf().savefig('convergence_studies/l1_error_conv_lambda_p.png', dpi=300)
+    plt.gcf().savefig('lambda_p_l1_error_post_conv.png', dpi=300)
+
+    plt.figure()
+    plt.semilogx(np.squeeze(n_evals_mc), kls_post_1hf, '-o', label='1 HF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), kls_post_1hf_1lf, '-o', label='1 HF, 1 LF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), kls_post_1hf_2lf, '-o', label='1 HF, 2 LF')
+    plt.semilogx(np.squeeze(n_evals_all), ref_kl * np.ones((len(n_evals_all))), 'k--')
+    plt.xlabel('No. high-fidelity samples')
+    plt.ylabel('Post-prior KL')
+    plt.legend(loc='upper right')
+    plt.gcf().savefig('lambda_p_post_prior_kls.png', dpi=300)
+
+    plt.figure()
+    plt.semilogx(np.squeeze(n_evals_mc), errors_prior_pf_1hf, '-o', label='1 HF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), errors_prior_pf_1hf_1lf, '-o', label='1 HF, 1 LF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), errors_prior_pf_1hf_2lf, '-o', label='1 HF, 2 LF')
+    plt.semilogx(np.squeeze(n_evals_all), np.zeros((len(n_evals_all))), 'k--')
+    plt.xlabel('No. high-fidelity samples')
+    plt.ylabel('L1-error in the prior push-forward')
+    plt.legend(loc='upper right')
+    plt.gcf().savefig('lambda_p_l1_error_prior_pf_conv.png', dpi=300)
+
+    plt.figure()
+    plt.semilogx(np.squeeze(n_evals_mc), kls_prior_pf_1hf, '-o', label='1 HF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), kls_prior_pf_1hf_1lf, '-o', label='1 HF, 1 LF')
+    plt.semilogx(np.squeeze(n_evals_bmfmc), kls_prior_pf_1hf_2lf, '-o', label='1 HF, 2 LF')
+    plt.semilogx(np.squeeze(n_evals_all), np.zeros((len(n_evals_all))), 'k--')
+    plt.xlabel('No. high-fidelity samples')
+    plt.ylabel('Prior-PF KL')
+    plt.legend(loc='upper right')
+    plt.gcf().savefig('lambda_p_prior_pf_kls.png', dpi=300)
 
 # --------------------------------------------------------------------------- #
