@@ -120,7 +120,7 @@ class BMFMC:
 
                 elif hf_model.n_qoi is 2:
                     ab_num = int(np.sqrt(hf_model.n_evals))
-                    hf_model.n_evals = ab_num**2
+                    hf_model.n_evals = ab_num ** 2
                     a = np.linspace(lf_model.model_evals_pred[:, 0].min(), lf_model.model_evals_pred[:, 0].max(),
                                     num=ab_num)
                     b = np.linspace(lf_model.model_evals_pred[:, 1].min(), lf_model.model_evals_pred[:, 1].max(),
@@ -221,16 +221,35 @@ class BMFMC:
             # Predict q_l|q_l-1 at all low-fidelity samples
             mu, sigma = regression_model.predict(x_pred, return_std=True)
 
-            # Generate low-fidelity samples from the predictions
+            # Generate high-fidelity samples from the predictions
             hf_model_evals_pred = np.zeros((mu.shape[0], mu.shape[1]))
             for i in range(mu.shape[0]):
-                hf_model_evals_pred[i] = mu[i, :] + sigma[i] * np.random.randn(1, mu.shape[1])
+                hf_model_evals_pred[i, :] = mu[i, :] + sigma[i] * np.random.randn(1, mu.shape[1])
+
+        elif self.regression_type == 'decoupled_gaussian_processes':
+
+            # Fit a GP regression model to approximate p(q_l|q_l-1)
+            kernel = ConstantKernel() * RBF() + WhiteKernel() + ConstantKernel() + DotProduct()
+
+            hf_model_evals_pred = np.zeros((x_pred.shape[0], x_pred.shape[1]))
+            regression_model = []
+            for k in range(x_train.shape[1]):
+
+                regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10))
+                regression_model[k].fit(np.expand_dims(x_train[:, k], axis=1), y_train[:, k])
+
+                # Predict q_l|q_l-1 at all low-fidelity samples
+                mu, sigma = regression_model[k].predict(np.expand_dims(x_pred[:, k], axis=1), return_std=True)
+
+                # Generate high-fidelity samples from the predictions
+                for i in range(mu.shape[0]):
+                    hf_model_evals_pred[i, k] = mu[i] + sigma[i] * np.random.randn()
 
         elif self.regression_type == 'heteroscedastic_gaussian_process':
 
             # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
             # See here for more info: https://github.com/jmetzen/gp_extras/
-            prototypes = KMeans(n_clusters=5).fit(x_train).cluster_centers_
+            prototypes = KMeans(n_clusters=10).fit(x_train).cluster_centers_
             kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1, (0.01, 100.0)) + HeteroscedasticKernel.construct(
                 prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
             regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
@@ -239,13 +258,13 @@ class BMFMC:
             # Predict q_l|q_l-1 at all low-fidelity samples
             mu, sigma = regression_model.predict(x_pred, return_std=True)
 
-            # Generate low-fidelity samples from the predictions
+            # Generate high-fidelity samples from the predictions
             hf_model_evals_pred = np.zeros((mu.shape[0], mu.shape[1]))
             for i in range(mu.shape[0]):
-                hf_model_evals_pred[i] = mu[i, :] + sigma[i] * np.random.randn(1, mu.shape[1])
+                hf_model_evals_pred[i, :] = mu[i, :] + sigma[i] * np.random.randn(1, mu.shape[1])
 
         else:
-            print('Unknown regression model.')
+            print('Unknown regression model %s.' % self.regression_type)
             exit()
 
         # Save regression model
@@ -299,6 +318,19 @@ class BMFMC:
         self.mc_model.evaluate()
         self.mc_model.set_model_evals_pred(self.mc_model.model_evals)
         self.mc_model.create_distribution()
+
+    # Calculate BMFMC estimator variance of the distribution mean
+    def calculate_bmfmc_mean_estimator_variance(self):
+
+        if self.n_models > 1 or self.models[0].n_qoi > 1:
+            print('This only works for one low-fidelity model and one QoI.')
+            exit()
+
+        regression_model = self.regression_models[-1]
+        x_pred = self.models[0].model_evals_pred
+        _, sigma = regression_model.predict(x_pred, return_std=True)
+
+        return np.sqrt(np.mean(sigma ** 2, axis=0))
 
     # Print some stats
     def print_stats(self, mc=False):
@@ -416,23 +448,38 @@ class BMFMC:
 
             regression_model = self.regression_models[i]
 
-            x_train = regression_model.X_train_
-            y_train = regression_model.y_train_
-            x_pred = lf_model.model_evals_pred
-            mu, sigma = regression_model.predict(x_pred, return_std=True)
+            # This hack is necessary if using the decoupled_gaussian_process
+            if isinstance(regression_model, list):
+                x_train = np.zeros((np.shape(regression_model[0].X_train_)[0], hf_model.n_qoi))
+                y_train = np.zeros((np.shape(regression_model[0].X_train_)[0], hf_model.n_qoi))
+                for k in range(len(regression_model)):
+                    x_train[:, k] = np.squeeze(regression_model[k].X_train_)
+                    y_train[:, k] = regression_model[k].y_train_
+                if hf_model.n_qoi == 1:
+                    regression_model = regression_model[0]
 
-            # Sort to be able to use the plt.fill
-            sort_indices = np.argsort(x_pred, axis=0)
-            x_pred = np.squeeze(x_pred[sort_indices])
-            y_pred = np.squeeze(mu[sort_indices])
-            sigma = np.squeeze(sigma[sort_indices])
+            else:
+                x_train = regression_model.X_train_
+                y_train = regression_model.y_train_
 
             if hf_model.n_qoi == 1:
+
+                x_pred = lf_model.model_evals_pred
+                mu, sigma = regression_model.predict(x_pred, return_std=True)
+
+                # Sort to be able to use the plt.fill
+                sort_indices = np.argsort(x_pred, axis=0)
+                x_pred = np.squeeze(x_pred[sort_indices])
+                y_pred = np.squeeze(mu[sort_indices])
+                sigma = np.squeeze(sigma[sort_indices])
+
                 utils.plot_1d_conf(x_pred, y_pred, sigma)
                 utils.plot_1d_data(x_train, y_train, marker='*', linestyle='', markersize=5, color='k',
                                    label='Training', title='BMFMC - regression model', xlabel=lf_model.rv_name,
                                    ylabel=hf_model.rv_name)
+
             elif hf_model.n_qoi == 2:
+
                 sns.kdeplot(lf_model.distribution.samples[:, 0], lf_model.distribution.samples[:, 1],
                             shade=True, shade_lowest=False, cmap='Blues')
                 sns.kdeplot(hf_model.distribution.samples[:, 0], hf_model.distribution.samples[:, 1],

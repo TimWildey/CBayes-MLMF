@@ -27,7 +27,7 @@ from CBayes import CBayesPosterior
 n_samples = int(1e4)
 
 # Forward model (lambda_p, ellptic_pde, elliptic_pde_2d, elliptic_pde_3d, ode_pp, ode_pp_2d)
-model = 'elliptic_pde'
+model = 'elliptic_pde_3d'
 
 # Push-forward method (mc, bmfmc)
 pf_method = 'bmfmc'
@@ -40,13 +40,13 @@ pf_method = 'bmfmc'
 # The number of models will thus be len(n_evals) + 1
 n_evals = [200, 100, 50, 20, 10]
 # n_evals = [100, 50, 20]
-n_evals = [20]
+n_evals = [100]
 
 # Training set selection strategy (support_covering, support_covering_adaptive, sampling, sampling_adaptive)
-training_set_strategy = 'support_covering'
+training_set_strategy = 'sampling'
 
-# Regression model type (gaussian_process, heteroscedastic_gaussian_process)
-regression_type = 'heteroscedastic_gaussian_process'
+# Regression model type (gaussian_process, heteroscedastic_gaussian_process, decoupled_gaussian_processes)
+regression_type = 'decoupled_gaussian_processes'
 
 
 # ---------------------------------------------------------- Todos ---------- #
@@ -55,15 +55,17 @@ regression_type = 'heteroscedastic_gaussian_process'
 # Framework
 # todo: (!!) check how to deal with the case where one has fixed evaluation points --> training_set_strategy: fixed
 # todo: (!) enhance plotting: https://www.safaribooksonline.com/library/view/python-data-science/9781491912126/ch04.html
+# todo: (!) think about the case where one has several lowest-fidelity levels (for 1 QoI, this implies a regression model with two inputs and one output)
 
 # Distributions
 # todo: (!) implement transformations of random variables to operate in unconstrained probability space only
 
 # Regression
+# todo: (!!!) check regression for multiple QoIs (separate GPs are probably more consistent and should perform better)
 # todo: (!) think about other regression models
 
 # Adaptive training
-# todo: (!) different options how to choose samples: uniform / LHS / sparse grids
+# todo: (!) different options how to choose support covering samples: uniform grid / LHS / sparse grids
 
 
 # ------------------------------------------------- Models & Methods -------- #
@@ -181,7 +183,10 @@ def get_prior_prior_pf_samples(n_samples):
             y_train = qvals[0:round(split * lam.shape[0])]
             lf_samples = elliptic_pde.construct_lowfi_model_and_get_samples(X_train=X_train, y_train=y_train,
                                                                             X_test=prior_samples)
-            lf_samples = np.sin(lf_samples)
+            # Add bias
+            lf_samples[:, 0] = np.sin(lf_samples[:, 0])
+            if np.shape(lf_samples)[1] > 1:
+                lf_samples[:, 1:] = 1.5*np.sin(lf_samples[:, 1:])
 
             lf_model = Model(eval_fun=lambda x: elliptic_pde.find_xy_pair(x, prior_samples, lf_samples),
                              rv_samples=prior_samples, rv_samples_pred=prior_samples, n_evals=n_samples, n_qoi=n_qoi,
