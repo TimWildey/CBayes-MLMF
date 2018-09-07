@@ -31,7 +31,7 @@ def plot_1d_data(x, y, marker='None', markersize=5, linestyle='-', linewidth=3, 
 
 # Plot a 1D kernel density estimation
 def plot_1d_kde(qkde, xmin=0.0, xmax=1.0, linestyle='-', linewidth=3, color='C0', num=1,
-                xlabel='$x$', ylabel='$p(x)$', label='', title=''):
+                xlabel='$x$', ylabel='$p(x)$', label='', title='KDE'):
 
     if len(str(num)) >= 3:
         plt.subplot(num)
@@ -48,7 +48,7 @@ def plot_1d_kde(qkde, xmin=0.0, xmax=1.0, linestyle='-', linewidth=3, color='C0'
 
 
 # Plot a 2D kernel density estimation
-def plot_2d_kde(samples, xlabel='$x_1$', ylabel='$x_2$', num=1, cmap='Blues'):
+def plot_2d_kde(samples, xlabel='$Q_1$', ylabel='$Q_2$', num=1, cmap='Blues', title='KDE'):
 
     if len(str(num)) >= 3:
         plt.subplot(num)
@@ -56,10 +56,14 @@ def plot_2d_kde(samples, xlabel='$x_1$', ylabel='$x_2$', num=1, cmap='Blues'):
         plt.figure(num)
 
     df = pd.DataFrame(samples, columns=[xlabel, ylabel])
-    g = sns.jointplot(x=xlabel, y=ylabel, data=df, kind='kde', color='C0', shade=True, shade_lowest=True, cmap=cmap)
-    g.plot_joint(plt.scatter, c='k', alpha=0.3, s=1, linewidth=0.0, marker='o')
+    g = sns.jointplot(x=xlabel, y=ylabel, data=df, kind='kde', color='C0', shade=True, shade_lowest=True, cmap=cmap,
+                      label='Density')
+    g.plot_joint(plt.scatter, c='k', alpha=0.3, s=1, linewidth=0.0, marker='o', label='Samples')
     g.ax_joint.collections[0].set_alpha(0)
     g.set_axis_labels(xlabel, ylabel)
+    plt.subplots_adjust(top=0.95)
+    g.fig.suptitle(title)
+    plt.legend()
 
 
 # Plot a 1D histogram given samples
@@ -76,8 +80,6 @@ def plot_1d_hist(samples, num=1, title='', xlabel='$x$', ylabel='$p(x)$'):
     plt.grid()
     plt.legend(loc='upper left')
     plt.title(title)
-    # plt.gcf().set_figheight(6)
-    # plt.gcf().set_figwidth(6)
 
 
 # Plot a 1D regression model with 99% confidence intervals

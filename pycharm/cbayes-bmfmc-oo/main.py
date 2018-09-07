@@ -24,12 +24,20 @@ from CBayes import CBayesPosterior
 
 
 # Number of lowest-fidelity samples (1e4 should be fine for 1 QoI)
+
 n_samples = int(1e4)
 
-# Forward model (lambda_p, ellptic_pde, elliptic_pde_2d, elliptic_pde_3d, ode_pp, ode_pp_2d)
+# Forward models:
+#   - lambda_p
+#   - ellptic_pde / elliptic_pde_2d / elliptic_pde_3d
+#   - ode_pp /  ode_pp_2d
+
 model = 'elliptic_pde_3d'
 
-# Push-forward method (mc, bmfmc)
+# Push-forward methods:
+#   - mc
+#   - bmfmc
+
 pf_method = 'bmfmc'
 
 # ----------------------------------------------------Config - BMFMC -------- #
@@ -38,14 +46,20 @@ pf_method = 'bmfmc'
 # Number of model evaluations in increasing fidelity (the lowest-fidelity model will always have n_samples evals)
 # Only lambda_p and ode_pp support more than one (i.e. arbitrary many) low-fidelity level
 # The number of models will thus be len(n_evals) + 1
-n_evals = [200, 100, 50, 20, 10]
-# n_evals = [100, 50, 20]
-n_evals = [100]
 
-# Training set selection strategy (support_covering, support_covering_adaptive, sampling, sampling_adaptive)
+n_evals = [100, 50, 20]
+n_evals = [6**3]
+
+# Training set selection strategies:
+#   - support_covering / support_covering_adaptive
+#   - sampling / sampling_adaptive
+
 training_set_strategy = 'sampling'
 
-# Regression model type (gaussian_process, heteroscedastic_gaussian_process, decoupled_gaussian_processes)
+# Regression model types
+#   - gaussian_process / decoupled_gaussian_processes
+#   - heteroscedastic_gaussian_process / decoupled_heteroscedastic_gaussian_process
+
 regression_type = 'decoupled_gaussian_processes'
 
 
@@ -53,6 +67,7 @@ regression_type = 'decoupled_gaussian_processes'
 
 
 # Framework
+# todo: (!!!) develop BMFMC diagnostics
 # todo: (!!) check how to deal with the case where one has fixed evaluation points --> training_set_strategy: fixed
 # todo: (!) enhance plotting: https://www.safaribooksonline.com/library/view/python-data-science/9781491912126/ch04.html
 # todo: (!) think about the case where one has several lowest-fidelity levels (for 1 QoI, this implies a regression model with two inputs and one output)
@@ -61,7 +76,9 @@ regression_type = 'decoupled_gaussian_processes'
 # todo: (!) implement transformations of random variables to operate in unconstrained probability space only
 
 # Regression
-# todo: (!!!) check regression for multiple QoIs (separate GPs are probably more consistent and should perform better)
+# todo: (!!) Do a covariance / correlation check before choosing shared or separate kernels for the GPs
+# todo: (!) better regression for multiple QoIs (multi-output GPs would be an option)
+# todo: (!) GPs with non-Gaussian noise for asymmetric correlations
 # todo: (!) think about other regression models
 
 # Adaptive training
@@ -419,7 +436,7 @@ if __name__ == '__main__':
     cbayes_post.print_stats()
 
     # Plot
-    cbayes_post.plot_results(1)
+    cbayes_post.plot_results(model_tag='hf')
 
     end = time.time()
     print('(High-fidelity CBayes elapsed time: %fs)\n' % (end - lap))
@@ -440,7 +457,7 @@ if __name__ == '__main__':
             cbayes_post_lf.print_stats()
             kls[i] = cbayes_post_lf.get_prior_post_kl()
             if i == 0:
-                cbayes_post_lf.plot_results(2)
+                cbayes_post_lf.plot_results(model_tag='lf')
 
         end = time.time()
         print('(Low-fidelities CBayes elapsed time: %fs)\n' % (end - lap))
@@ -453,14 +470,14 @@ if __name__ == '__main__':
         print('Evaluating the Monte Carlo posterior ...')
         cbayes_post_mc.print_stats()
         mc_kl = cbayes_post_mc.get_prior_post_kl()
-        cbayes_post_mc.plot_results(3)
+        cbayes_post_mc.plot_results(model_tag='mc')
 
         end = time.time()
         print('(Monte Carlo CBayes elapsed time: %fs)\n' % (end - lap))
         lap = time.time()
 
         # Plot Posterior-Prior KLs
-        plt.figure(4)
+        plt.figure()
         plt.plot(range(1, len(n_evals) + 2), mc_kl * np.ones((len(n_evals) + 1,)), 'k--', label='MC KL')
         plt.plot(range(1, len(n_evals) + 2), kls, '-x', label='Model KLs')
         plt.grid()

@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import gaussian_process
-from sklearn.gaussian_process.kernels import WhiteKernel, RBF, ConstantKernel, Product, DotProduct
+from sklearn.gaussian_process.kernels import WhiteKernel, RBF, ConstantKernel
 from sklearn.cluster import KMeans
 from gp_extras.kernels import HeteroscedasticKernel
 import seaborn as sns
@@ -128,8 +128,20 @@ class BMFMC:
                     aa, bb = np.meshgrid(a, b)
                     x_train_linspace = np.reshape(np.vstack([aa, bb]), (2, hf_model.n_evals)).T
 
+                elif hf_model.n_qoi is 3:
+                    abc_num = int(np.power(hf_model.n_evals, 1./3))
+                    hf_model.n_evals = abc_num ** 3
+                    a = np.linspace(lf_model.model_evals_pred[:, 0].min(), lf_model.model_evals_pred[:, 0].max(),
+                                    num=abc_num)
+                    b = np.linspace(lf_model.model_evals_pred[:, 1].min(), lf_model.model_evals_pred[:, 1].max(),
+                                    num=abc_num)
+                    c = np.linspace(lf_model.model_evals_pred[:, 2].min(), lf_model.model_evals_pred[:, 2].max(),
+                                    num=abc_num)
+                    aa, bb, cc = np.meshgrid(a, b, c)
+                    x_train_linspace = np.reshape(np.vstack([aa, bb, cc]), (3, hf_model.n_evals)).T
+
                 else:
-                    print('Support covering strategy only available for 1 or 2 QoIs.')
+                    print('Support covering strategy only available for up to 3 QoIs. Use sampling.')
                     exit()
 
             else:
@@ -141,7 +153,7 @@ class BMFMC:
                     x_train_linspace = sorted_xtrain[:-1, :] + 0.5 * diffs
 
                 else:
-                    print('Support covering adaptive strategy only available for 1 QoI.')
+                    print('Support covering adaptive strategy only available for 1 QoI. Use sampling_adaptive.')
                     exit()
 
             n_train = np.shape(x_train_linspace)[0]
@@ -160,7 +172,16 @@ class BMFMC:
                 # We use the mean predictions of the GP to do that.
                 else:
                     regression_model = self.regression_models[id - 1]
-                    mu = regression_model.predict(self.models[id - 1].model_evals_pred, return_std=False)
+
+                    # This hack is necessary if using the decoupled GPs
+                    if isinstance(regression_model, list):
+                        mu = np.zeros((self.models[0].n_evals, hf_model.n_qoi))
+                        for k in range(len(regression_model)):
+                            pred = np.expand_dims(self.models[id - 1].model_evals_pred[:, k], axis=1)
+                            mu[:, k] = regression_model[k].predict(pred, return_std=False)
+                    else:
+                        mu = regression_model.predict(self.models[id - 1].model_evals_pred, return_std=False)
+
                     idx = (np.linalg.norm(mu - x_train_linspace[i, :], axis=1, ord=1)).argmin()
                     x_train[i, :] = lf_model.eval_fun(lf_model.rv_samples_pred[idx, :])
 
@@ -213,7 +234,7 @@ class BMFMC:
         if self.regression_type == 'gaussian_process':
 
             # Fit a GP regression model to approximate p(q_l|q_l-1)
-            kernel = ConstantKernel() * RBF() + WhiteKernel() + ConstantKernel() + DotProduct()
+            kernel = ConstantKernel() * RBF() + WhiteKernel() + ConstantKernel()
             # kernel = Matern() + WhiteKernel()
             regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
             regression_model.fit(x_train, y_train)
@@ -229,7 +250,7 @@ class BMFMC:
         elif self.regression_type == 'decoupled_gaussian_processes':
 
             # Fit a GP regression model to approximate p(q_l|q_l-1)
-            kernel = ConstantKernel() * RBF() + WhiteKernel() + ConstantKernel() + DotProduct()
+            kernel = ConstantKernel() * RBF() + WhiteKernel() + ConstantKernel()
 
             hf_model_evals_pred = np.zeros((x_pred.shape[0], x_pred.shape[1]))
             regression_model = []
@@ -262,6 +283,27 @@ class BMFMC:
             hf_model_evals_pred = np.zeros((mu.shape[0], mu.shape[1]))
             for i in range(mu.shape[0]):
                 hf_model_evals_pred[i, :] = mu[i, :] + sigma[i] * np.random.randn(1, mu.shape[1])
+
+        elif self.regression_type == 'decoupled_heteroscedastic_gaussian_process':
+
+            # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
+            # See here for more info: https://github.com/jmetzen/gp_extras/
+            hf_model_evals_pred = np.zeros((x_pred.shape[0], x_pred.shape[1]))
+            regression_model = []
+            for k in range(x_train.shape[1]):
+                prototypes = KMeans(n_clusters=10).fit(np.expand_dims(x_pred[:, k], axis=1)).cluster_centers_
+                kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1, (0.01, 100.0)) + HeteroscedasticKernel.construct(
+                    prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
+
+                regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10))
+                regression_model[k].fit(np.expand_dims(x_train[:, k], axis=1), y_train[:, k])
+
+                # Predict q_l|q_l-1 at all low-fidelity samples
+                mu, sigma = regression_model[k].predict(np.expand_dims(x_pred[:, k], axis=1), return_std=True)
+
+                # Generate high-fidelity samples from the predictions
+                for i in range(mu.shape[0]):
+                    hf_model_evals_pred[i, k] = mu[i] + sigma[i] * np.random.randn()
 
         else:
             print('Unknown regression model %s.' % self.regression_type)
@@ -392,45 +434,46 @@ class BMFMC:
                 exit()
 
             plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
-            plt.clf()
 
         elif self.models[0].n_qoi == 2:
 
             sns.kdeplot(self.models[0].distribution.samples[:, 0], self.models[0].distribution.samples[:, 1],
-                        shade=True, shade_lowest=False, cmap='Blues')
+                        shade=True, shade_lowest=False, cmap='Blues', label='Low-fidelity', color='C0')
             sns.kdeplot(self.models[-1].distribution.samples[:, 0], self.models[-1].distribution.samples[:, 1],
-                        shade=True, shade_lowest=False, cmap='Reds')
+                        shade=True, shade_lowest=False, cmap='Reds', label='High-fidelity', color='C3')
 
             if mc and self.mc_model is not None:
                 sns.kdeplot(self.mc_model.distribution.samples[:, 0], self.mc_model.distribution.samples[:, 1],
-                            cmap='Greys', alpha=1.0)
+                            cmap='Greys', alpha=1.0, label='MC reference', color='Black')
             elif mc and self.mc_model is None:
                 print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
                 exit()
+            plt.xlabel('$Q_1$')
+            plt.ylabel('$Q_2$')
+            plt.legend(loc='upper right')
+            plt.title('BMFMC - approximate distributions')
 
             plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
             xmin, xmax = plt.xlim()
             ymin, ymax = plt.ylim()
             plt.clf()
 
-            self.models[0].distribution.plot_kde()
+            self.models[0].distribution.plot_kde(title='BMFMC - low fidelity')
             plt.xlim([xmin, xmax])
             plt.ylim([ymin, ymax])
             plt.gcf().savefig('pngout/bmfmc_lf.png', dpi=300)
             plt.clf()
 
-            self.models[-1].distribution.plot_kde()
+            self.models[-1].distribution.plot_kde(title='BMFMC - high fidelity')
             plt.xlim([xmin, xmax])
             plt.ylim([ymin, ymax])
             plt.gcf().savefig('pngout/bmfmc_hf.png', dpi=300)
-            plt.clf()
 
             if mc and self.mc_model is not None:
-                self.mc_model.distribution.plot_kde()
+                self.mc_model.distribution.plot_kde(title='Monte Carlo reference')
                 plt.xlim([xmin, xmax])
                 plt.ylim([ymin, ymax])
                 plt.gcf().savefig('pngout/bmfmc_mc.png', dpi=300)
-                plt.clf()
             elif mc and self.mc_model is None:
                 print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
                 exit()
@@ -438,6 +481,8 @@ class BMFMC:
         else:
             print('BMFMC plotting only available for 1 and 2 QoIs.')
             exit()
+
+        plt.clf()
 
     # Plot the regression models
     def plot_regression_models(self):
@@ -448,7 +493,7 @@ class BMFMC:
 
             regression_model = self.regression_models[i]
 
-            # This hack is necessary if using the decoupled_gaussian_process
+            # This hack is necessary if using the decoupled GPs
             if isinstance(regression_model, list):
                 x_train = np.zeros((np.shape(regression_model[0].X_train_)[0], hf_model.n_qoi))
                 y_train = np.zeros((np.shape(regression_model[0].X_train_)[0], hf_model.n_qoi))
@@ -490,6 +535,9 @@ class BMFMC:
                 for k in range(np.shape(x_train)[0]):
                     plt.plot([x_train[k, 0], y_train[k, 0]], [x_train[k, 1], y_train[k, 1]], linestyle='--', color='k',
                              linewidth=1)
+                plt.xlabel('$Q_1$')
+                plt.ylabel('$Q_2$')
+                plt.title('BMFMC - regression model')
 
             if self.n_models > 2:
                 plt.gcf().savefig('pngout/bmfmc_regression_model_' + str(i + 1) + '.png', dpi=300)
@@ -506,8 +554,7 @@ class BMFMC:
             hf_model = self.models[i + 1]
 
             samples = np.vstack([np.squeeze(lf_model.model_evals_pred), np.squeeze(hf_model.model_evals_pred)])
-            utils.plot_2d_kde(samples=samples.T,
-                              xlabel=lf_model.rv_name, ylabel=hf_model.rv_name)
+            utils.plot_2d_kde(samples=samples.T, title='Joint and marginals')
 
             if self.n_models > 2:
                 plt.gcf().savefig('pngout/bmfmc_joint_dist_' + str(i + 1) + '.png', dpi=300)

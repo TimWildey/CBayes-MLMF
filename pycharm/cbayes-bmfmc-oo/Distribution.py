@@ -74,13 +74,13 @@ class Distribution:
         return kl
 
     # Plot the KDE density
-    def plot_kde(self, fignum=1, color='C0', linestyle='-', xmin=0.0, xmax=1.0, title=''):
+    def plot_kde(self, fignum=1, color='C0', linestyle='-', xmin=0.0, xmax=1.0, title='KDE'):
         if self.n_dim == 1:
             utils.plot_1d_kde(qkde=self.kernel_density, xmin=xmin, xmax=xmax, label=self.label, linestyle=linestyle,
                               num=fignum, xlabel=self.rv_name, ylabel='$p($' + self.rv_name + '$)$', color=color,
                               title=title)
         elif self.n_dim == 2:
-            utils.plot_2d_kde(samples=self.samples, num=fignum)
+            utils.plot_2d_kde(samples=self.samples, num=fignum, title=title)
         else:
             print('KDE plots are only available for 1 and 2 dimensions.')
             exit()

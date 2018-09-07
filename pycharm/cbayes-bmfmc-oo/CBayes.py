@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import warnings
 
 from Distribution import Distribution
@@ -116,7 +117,7 @@ class CBayesPosterior:
         print('')
 
     # Plot results
-    def plot_results(self, fignum=1):
+    def plot_results(self, model_tag='hf'):
 
         # Determine bounds
         xmin = np.min([np.min(self.p_prior_pf.samples), np.min(self.p_obs.samples)])
@@ -124,35 +125,32 @@ class CBayesPosterior:
 
         # Plot
         if self.p_obs.n_dim == 1:
-            self.p_prior_pf.plot_kde(fignum=fignum, color='C0', xmin=xmin, xmax=xmax)
-            self.p_obs.plot_kde(fignum=fignum, color='C1', xmin=xmin, xmax=xmax)
-            self.p_post_pf.plot_kde(fignum=fignum, color='C2', linestyle='--', xmin=xmin, xmax=xmax,
-                                    title='CBayes')
+            self.p_prior_pf.plot_kde(color='C0', xmin=xmin, xmax=xmax)
+            self.p_obs.plot_kde(color='C1', xmin=xmin, xmax=xmax)
+            self.p_post_pf.plot_kde(color='C2', linestyle='--', xmin=xmin, xmax=xmax, title='CBayes %s' % model_tag)
+
         elif self.p_obs.n_dim == 2:
-            import seaborn as sns
             sns.kdeplot(self.p_prior_pf.samples[:, 0], self.p_prior_pf.samples[:, 1], shade=True, shade_lowest=False,
-                        cmap='Blues')
-            sns.kdeplot(self.p_obs.samples[:, 0], self.p_obs.samples[:, 1], shade=True, shade_lowest=False, cmap='Reds')
-            sns.kdeplot(self.p_post_pf.samples[:, 0], self.p_post_pf.samples[:, 1], cmap='Greys', alpha=1.0)
-
-        if fignum == 2:
-            plt.gcf().savefig('pngout/cbayes_dists_lf.png', dpi=300)
-            plt.clf()
-        elif fignum == 3:
-            plt.gcf().savefig('pngout/cbayes_dists_mc.png', dpi=300)
-            plt.clf()
+                        cmap='Blues', label='Prior PF', color='C0')
+            sns.kdeplot(self.p_obs.samples[:, 0], self.p_obs.samples[:, 1], shade=True, shade_lowest=False, cmap='Reds',
+                        label='Observed density', color='C3')
+            sns.kdeplot(self.p_post_pf.samples[:, 0], self.p_post_pf.samples[:, 1], cmap='Greys', alpha=1.0,
+                        label='Posterior PF', color='Black')
+            plt.legend(loc='upper right')
+            plt.xlabel('$Q_1$')
+            plt.ylabel('$Q_2$')
+            plt.title('CBayes %s' % model_tag)
         else:
-            plt.gcf().savefig('pngout/cbayes_dists_hf.png', dpi=300)
-            plt.clf()
+            return
 
-            # Plot some bivariate distributions
-            if self.p_obs.n_dim == 2:
-                self.p_prior_pf.plot_kde(fignum=fignum)
-                plt.gcf().savefig('pngout/cbayes_dists_hf_prior_pf.png', dpi=300)
-                plt.clf()
-                self.p_obs.plot_kde(fignum=fignum)
+        plt.gcf().savefig('pngout/cbayes_dists_%s.png' % model_tag, dpi=300)
+
+        # Plot some bivariate distributions
+        if self.p_obs.n_dim == 2 and model_tag == 'hf':
+                self.p_obs.plot_kde(title='Observed density')
                 plt.gcf().savefig('pngout/cbayes_dists_obs.png', dpi=300)
                 plt.clf()
-                self.p_post_pf.plot_kde(fignum=fignum)
+                self.p_post_pf.plot_kde(title='Posterior push-forward')
                 plt.gcf().savefig('pngout/cbayes_dists_hf_post_pf.png', dpi=300)
-                plt.clf()
+
+        plt.clf()

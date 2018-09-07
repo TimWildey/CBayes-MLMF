@@ -85,7 +85,7 @@ if __name__ == '__main__':
     # Model settings
     u0 = np.array([5, 1])
     finalt = 1.0
-    dt_hf = 0.1
+    dt_hf = 0.5
     dt_lf_2 = 0.6
     dt_lf_1 = 0.9
     dt_lf_0 = 1.0
