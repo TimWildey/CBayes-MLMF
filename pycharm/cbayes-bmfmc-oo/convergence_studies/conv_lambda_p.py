@@ -28,7 +28,7 @@ regression_type = 'gaussian_process'
 
 if __name__ == '__main__':
 
-    n_evals_mc = np.logspace(np.log10(50), np.log10(2000), 20)
+    n_evals_mc = np.logspace(np.log10(50), np.log10(2000), 10)
     n_evals_mc = np.round(n_evals_mc).astype(int)
     n_evals_bmfmc = np.logspace(np.log10(5), np.log10(200), 10)
     n_evals_bmfmc = np.round(n_evals_bmfmc).astype(int)

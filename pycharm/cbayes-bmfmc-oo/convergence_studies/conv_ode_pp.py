@@ -28,7 +28,7 @@ regression_type = 'heteroscedastic_gaussian_process'
 
 if __name__ == '__main__':
 
-    n_evals_mc = np.logspace(np.log10(50), np.log10(2000), 20)
+    n_evals_mc = np.logspace(np.log10(50), np.log10(1000), 10)
     n_evals_mc = np.round(n_evals_mc).astype(int)
     n_evals_bmfmc = np.logspace(np.log10(20), np.log10(500), 10)
     n_evals_bmfmc = np.round(n_evals_bmfmc).astype(int)
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     # Model settings
     u0 = np.array([5, 1])
     finalt = 1.0
-    dt_hf = 0.1
+    dt_hf = 0.5
 
     ref_settings = ode_pp.Settings(finalt=finalt, dt=dt_hf, u0=u0)
 

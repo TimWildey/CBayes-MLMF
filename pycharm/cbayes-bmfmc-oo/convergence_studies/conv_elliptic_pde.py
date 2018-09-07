@@ -28,9 +28,9 @@ regression_type = 'heteroscedastic_gaussian_process'
 
 if __name__ == '__main__':
 
-    n_evals_mc = np.logspace(np.log10(50), np.log10(2000), 20)
+    n_evals_mc = np.logspace(np.log10(50), np.log10(2000), 15)
     n_evals_mc = np.round(n_evals_mc).astype(int)
-    n_evals_bmfmc = np.logspace(np.log10(20), np.log10(500), 10)
+    n_evals_bmfmc = np.logspace(np.log10(20), np.log10(2000), 15)
     n_evals_bmfmc = np.round(n_evals_bmfmc).astype(int)
     n_evals_all = n_evals_mc.tolist() + list(set(n_evals_bmfmc.tolist()) - set(n_evals_mc.tolist()))
     n_evals_all.sort()
