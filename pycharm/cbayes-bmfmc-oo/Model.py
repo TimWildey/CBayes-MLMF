@@ -77,7 +77,11 @@ class Model:
 
         self.rv_samples_pred = rv_samples_pred
 
-    # Set the model predictions at the specified self.rv_samples_pred
+    # Set the model evaluations at the specified model_evals
+    def set_model_evals(self, model_evals):
+        self.model_evals = model_evals
+
+    # Set the model predictions at the specified model_evals_pred
     def set_model_evals_pred(self, model_evals_pred):
 
         self.model_evals_pred = model_evals_pred

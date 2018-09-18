@@ -18,10 +18,10 @@ class BMFMC:
     # - regression_model: regression model for the conditionals p(q_l|q_l-1)
 
     # Constructor
-    def __init__(self, models, training_set_strategy, regression_type):
+    def __init__(self, models, training_set_strategy, regression_type, mc_model=None):
 
         self.models = models
-        self.mc_model = None
+        self.mc_model = mc_model
         self.n_models = len(models)
         self.training_set_strategy = training_set_strategy
         self.regression_type = regression_type
@@ -162,11 +162,13 @@ class BMFMC:
     # Calculate a Monte Carlo reference solution
     def calculate_mc_reference(self):
 
-        self.mc_model = Model(eval_fun=self.models[-1].eval_fun, n_evals=self.models[0].n_evals,
-                              n_qoi=self.models[-1].n_qoi, rv_samples=self.models[0].rv_samples,
-                              rv_samples_pred=self.models[0].rv_samples, label='MC reference',
-                              rv_name=self.models[-1].rv_name)
-        self.mc_model.evaluate()
+        if self.mc_model is None:
+            self.mc_model = Model(eval_fun=self.models[-1].eval_fun, n_evals=self.models[0].n_evals,
+                                  n_qoi=self.models[-1].n_qoi, rv_samples=self.models[0].rv_samples,
+                                  rv_samples_pred=self.models[0].rv_samples, label='MC reference',
+                                  rv_name=self.models[-1].rv_name)
+            self.mc_model.evaluate()
+
         self.mc_model.set_model_evals_pred(self.mc_model.model_evals)
         self.mc_model.create_distribution()
 

@@ -121,7 +121,17 @@ class Regression:
         x_train = None
         adaptive = True
 
-        if self.training_set_strategy == 'support_covering' or self.training_set_strategy == 'support_covering_adaptive':
+        if self.training_set_strategy == 'fixed':
+
+            # Find lf_rv_samples corresponding to hf_rv_samples
+            x_train = np.zeros((hf_model.n_evals, hf_model.n_qoi))
+            for i in range(hf_model.n_evals):
+                idx = (np.linalg.norm(lf_model.rv_samples - hf_model.rv_samples[i, :], axis=1, ord=1)).argmin()
+                x_train[i, :] = lf_model.model_evals[idx, :]
+
+            adaptive = False
+
+        elif self.training_set_strategy in ['support_covering', 'support_covering_adaptive']:
 
             if len(regression_models) == id:
                 # Create a uniform grid across the support of p(q)
@@ -207,7 +217,7 @@ class Regression:
                 # No adaptivity
                 adaptive = False
 
-        elif self.training_set_strategy == 'sampling' or self.training_set_strategy == 'sampling_adaptive':
+        elif self.training_set_strategy in ['sampling', 'sampling_adaptive']:
 
             # Get some random variable samples
             indices = np.random.choice(range(lf_model.rv_samples_pred.shape[0]), size=hf_model.n_evals, replace=False)

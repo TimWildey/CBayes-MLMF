@@ -13,6 +13,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/models')
 import lambda_p
 import elliptic_pde
 import elliptic_pde_ml
+import elliptic_pde_ml_fixed
 import ode_pp
 
 # Framework stuff
@@ -31,6 +32,8 @@ n_samples = int(1e4)
 # Forward models:
 #   - lambda_p
 #   - ellptic_pde / elliptic_pde_2d / elliptic_pde_3d
+#   - ellptic_pde_ml / elliptic_pde_ml_2d / elliptic_pde_ml_3d
+#   - ellptic_pde_ml_fixed / elliptic_pde_ml_fixed_2d / elliptic_pde_ml_fixed_3d
 #   - ode_pp /  ode_pp_2d
 
 model = 'elliptic_pde_3d'
@@ -70,7 +73,6 @@ regression_type = 'decoupled_gaussian_processes'
 # Framework
 # todo: (!!!) how to translate error estimates from one hierarchy to the next?
 # todo: (!!) implement BMFMC training / validation set error estimates
-# todo: (!!) check how to deal with the case where one has fixed evaluation points --> training_set_strategy: fixed --> preset model_evals during setup
 # todo: (!) enhance plotting: https://www.safaribooksonline.com/library/view/python-data-science/9781491912126/ch04.html
 # todo: (!) think about the case where one has several lowest-fidelity levels (for 1 QoI, this implies a regression model with two inputs and one output)
 
@@ -78,7 +80,6 @@ regression_type = 'decoupled_gaussian_processes'
 # todo: (!) implement transformations of random variables to operate in unconstrained probability space only
 
 # Regression
-# todo: (!!!) Create a generic regression model data type to allow for more freedom in the modeling
 # todo: (!!) Do a covariance / correlation check before choosing shared or separate kernels for the GPs
 # todo: (!) better regression for multiple QoIs (multi-output GPs would be an option)
 # todo: (!) GPs with non-Gaussian noise for asymmetric correlations
@@ -94,7 +95,7 @@ regression_type = 'decoupled_gaussian_processes'
 
 
 def get_prior_prior_pf_samples(n_samples):
-    prior_samples = prior_pf_samples = obs_loc = obs_scale = prior_pf_mc_samples = []
+    prior_samples = prior_pf_samples = obs_loc = obs_scale = prior_pf_mc_samples = mc_model = None
 
     # Check push forward method
     if pf_method not in ['mc', 'bmfmc']:
@@ -297,6 +298,81 @@ def get_prior_prior_pf_samples(n_samples):
                 print('Unsupported number of models for elliptic_pde_ml.')
                 exit()
 
+    elif model in ['elliptic_pde_ml_fixed', 'elliptic_pde_ml_fixed_2d', 'elliptic_pde_ml_fixed_3d']:
+
+        # Setup and load data
+        if model == 'elliptic_pde_ml':
+            n_qoi = 1
+            obs_loc = [0.7]
+            obs_scale = [0.01]
+
+        elif model == 'elliptic_pde_ml_2d':
+            n_qoi = 2
+            obs_loc = [0.7, 0.1]
+            obs_scale = [0.01, 0.01]
+
+        elif model == 'elliptic_pde_ml_3d':
+            n_qoi = 3
+            obs_loc = [0.71, 0.12, 0.48]
+            obs_scale = [0.01, 0.01, 0.01]
+
+        h = 160 / 2 ** len(n_evals)
+        prior_pf_samples = elliptic_pde_ml_fixed.load_data(h=h, n_evals=n_evals)
+        prior_samples = np.reshape(range(n_samples), (n_samples, 1))  # we only need some id here
+
+        if len(n_evals) > 4:
+            print('elliptic_pde only supports 5 levels of fidelity.')
+            exit()
+
+        # Create a MC model
+        mc_model = Model(
+            eval_fun=None,
+            rv_samples=prior_samples, rv_samples_pred=prior_samples, n_evals=n_samples, n_qoi=n_qoi,
+            rv_name='$Q$', label='MC reference')
+        mc_model.set_model_evals(elliptic_pde_ml_fixed.load_mc_reference()[:, 0:n_qoi])
+
+        # Create a low-fidelity model
+        lf_model = Model(
+            eval_fun=None,
+            rv_samples=prior_samples, rv_samples_pred=prior_samples, n_evals=n_samples, n_qoi=n_qoi,
+            rv_name='$q_0$', label='Low-fidelity')
+        lf_model.set_model_evals(prior_pf_samples[0][:, 0:n_qoi])
+
+        # Create a high-fidelity model
+        hf_model = Model(
+            eval_fun=None,
+            rv_samples=prior_samples[0:n_evals[-1], :], rv_samples_pred=prior_samples, n_evals=n_evals[-1], n_qoi=n_qoi,
+            rv_name='$Q$', label='High-fidelity')
+        hf_model.set_model_evals(prior_pf_samples[-1][:, 0:n_qoi])
+
+        if len(n_evals) == 2:
+            # Create a mid fidelity model
+            mf_model = Model(
+                eval_fun=None,
+                rv_samples=prior_samples[0:n_evals[0], :], rv_samples_pred=prior_samples, n_evals=n_evals[0],
+                n_qoi=n_qoi, rv_name='$q_m$', label='Mid-fidelity')
+            mf_model.set_model_evals(prior_pf_samples[1][:, 0:n_qoi])
+            models = [lf_model, mf_model, hf_model]
+
+        elif len(n_evals) > 2:
+            models = [lf_model]
+            for i in range(len(n_evals) - 1):
+                models.append(
+                    Model(
+                        eval_fun=None,
+                        rv_samples=prior_samples[0:n_evals[i], :], rv_samples_pred=prior_samples, n_evals=n_evals[i],
+                        n_qoi=n_qoi, rv_name='$q_%d$' % int(i + 1),
+                        label='Mid-%d-fidelity' % int(i + 1)))
+                models[i+1].set_model_evals(prior_pf_samples[i + 1][:, 0:n_qoi])
+            models.append(hf_model)
+
+        elif len(n_evals) == 1:
+            models = [lf_model, hf_model]
+
+        else:
+            print('Unsupported number of models for elliptic_pde_ml_fixed.')
+            exit()
+
     elif model == 'ode_pp':
 
         n_qoi = 1
@@ -445,7 +521,7 @@ def get_prior_prior_pf_samples(n_samples):
 
     if pf_method == 'bmfmc':
         # Setup BMFMC
-        bmfmc = BMFMC(models=models,
+        bmfmc = BMFMC(models=models, mc_model=mc_model,
                       training_set_strategy=training_set_strategy, regression_type=regression_type)
 
         # Apply BMFMC
@@ -456,6 +532,61 @@ def get_prior_prior_pf_samples(n_samples):
 
         # Diagnostics
         bmfmc.print_stats(mc=True)
+
+        # TEST
+
+        # # Densities
+        # print(bmfmc.calculate_bmfmc_density_expectation(val=0.7))
+        # # print(bmfmc.calculate_bmfmc_density_expectation_estimator_variance(val=0.7))
+        #
+        # # Probabilities
+        # print(bmfmc.calculate_bmfmc_expectation(fun=lambda x: x < 0.7))
+        # print(bmfmc.calculate_bmfmc_expectation_estimator_variance(fun=lambda x: x < 0.7))
+        #
+        # # BMFMC mean estimator variance via Gaussian assumption and general expectation variance
+        # print(bmfmc.calculate_bmfmc_mean_estimator_variance())
+        # print(bmfmc.calculate_bmfmc_expectation_estimator_variance())
+        #
+        # # BMFMC mean and variance via general expectation
+        # mean = bmfmc.calculate_bmfmc_expectation()
+        # print(mean)
+        # print(bmfmc.calculate_bmfmc_expectation(fun=lambda x: (x - mean)**2))
+        #
+        # # BMFMC mean and variance via samples
+        # print(np.mean(bmfmc.models[-1].model_evals_pred, axis=0))
+        # print(np.var(bmfmc.models[-1].model_evals_pred, axis=0))
+        #
+        # n_vals = 50
+        # cdf_mean, y_range = bmfmc.calculate_bmfmc_cdf(n_vals=n_vals)
+        # cdf_std, _ = bmfmc.calculate_bmfmc_cdf_estimator_variance(n_vals=n_vals)
+        #
+        # plt.figure()
+        # plt.plot(cdf_mean)
+        # plt.plot(cdf_mean + 1.96 * cdf_std)
+        # plt.plot(cdf_mean - 1.96 * cdf_std)
+        #
+        # y_diffs = np.diff(y_range)
+        # p_std = np.zeros((y_diffs.shape[0], 1))
+        # p_std_m = np.zeros((y_diffs.shape[0], 1))
+        # cdf_std_m = cdf_mean - 1.96*cdf_std
+        # cdf_std_p = cdf_mean + 1.96 * cdf_std
+        # p_std_p = np.zeros((y_diffs.shape[0], 1))
+        # p_mean = np.zeros((y_diffs.shape[0], 1))
+        # for i in range(y_diffs.shape[0]):
+        #     p_std[i] = (cdf_std[i + 1] - cdf_std[i]) / y_diffs[i]
+        #     p_mean[i] = (cdf_mean[i + 1] - cdf_mean[i]) / y_diffs[i]
+        #     p_std_m[i] = (cdf_std_m[i + 1] - cdf_std_m[i]) / y_diffs[i]
+        #     p_std_p[i] = (cdf_std_p[i + 1] - cdf_std_p[i]) / y_diffs[i]
+        #
+        # plt.figure()
+        # plt.plot(p_mean)
+        # plt.plot(p_std_p)
+        # plt.plot(p_std_m)
+        #
+        # plt.show()
+        # exit()
+
+        # TEST
 
         if n_qoi == 1:
             bmfmc.plot_results(mc=True)
