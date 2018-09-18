@@ -5,6 +5,7 @@ from sklearn.gaussian_process.kernels import WhiteKernel, RBF, ConstantKernel
 from sklearn.cluster import KMeans
 from gp_extras.kernels import HeteroscedasticKernel
 import seaborn as sns
+import scipy.stats as stats
 
 import utils
 from Model import Model
@@ -270,7 +271,7 @@ class BMFMC:
 
             # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
             # See here for more info: https://github.com/jmetzen/gp_extras/
-            prototypes = KMeans(n_clusters=10).fit(x_train).cluster_centers_
+            prototypes = KMeans(n_clusters=5).fit(x_train).cluster_centers_
             kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1, (0.01, 100.0)) + HeteroscedasticKernel.construct(
                 prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
             regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
@@ -291,7 +292,7 @@ class BMFMC:
             hf_model_evals_pred = np.zeros((x_pred.shape[0], x_pred.shape[1]))
             regression_model = []
             for k in range(x_train.shape[1]):
-                prototypes = KMeans(n_clusters=10).fit(np.expand_dims(x_pred[:, k], axis=1)).cluster_centers_
+                prototypes = KMeans(n_clusters=5).fit(np.expand_dims(x_pred[:, k], axis=1)).cluster_centers_
                 kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1, (0.01, 100.0)) + HeteroscedasticKernel.construct(
                     prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
 
@@ -364,7 +365,7 @@ class BMFMC:
     # Calculate BMFMC estimator variance of the distribution mean
     def calculate_bmfmc_mean_estimator_variance(self):
 
-        if self.n_models > 1 or self.models[0].n_qoi > 1:
+        if self.n_models > 2 or self.models[0].n_qoi > 1:
             print('This only works for one low-fidelity model and one QoI.')
             exit()
 
@@ -372,7 +373,128 @@ class BMFMC:
         x_pred = self.models[0].model_evals_pred
         _, sigma = regression_model.predict(x_pred, return_std=True)
 
-        return np.sqrt(np.mean(sigma ** 2, axis=0))
+        return np.mean(sigma ** 2, axis=0)
+
+    # Calculate the CDF
+    def calculate_bmfmc_cdf(self, n_vals=10):
+
+        if self.n_models > 2 or self.models[0].n_qoi > 1:
+            print('This only works for one low-fidelity model and one QoI.')
+            exit()
+
+        # Get regression model
+        regression_model = self.regression_models[-1]
+        x_pred = self.models[0].model_evals_pred
+        mu, sigma = regression_model.predict(x_pred, return_std=True)
+
+        # Approximate CDF
+        mean = self.models[-1].distribution.mean()
+        std = self.models[-1].distribution.std()
+        y_range = np.linspace(mean-3*std, mean+3*std, n_vals)
+        n_lf = self.models[0].n_samples
+        cdf_samples = np.zeros((n_lf, y_range.shape[0]))
+        print('')
+        for i in range(y_range.shape[0]):
+            print('CDF means %d / %d' % (i + 1, y_range.shape[0]))
+            for j in range(n_lf):
+                cdf_samples[j, i] = stats.norm.cdf((y_range[i] - mu[j]) / (sigma[j]+1e-15))
+
+        return np.mean(cdf_samples, 0), y_range
+
+    # Calculate CDF estimator error bars
+    def calculate_bmfmc_cdf_estimator_variance(self, n_vals=10):
+
+        if self.n_models > 2 or self.models[0].n_qoi > 1:
+            print('This only works for one low-fidelity model and one QoI.')
+            exit()
+
+        # Get regression model
+        regression_model = self.regression_models[-1]
+        x_pred = self.models[0].model_evals_pred
+        mu, sigma = regression_model.predict(x_pred, return_std=True)
+
+        # Approximate CDF
+        mean = self.models[-1].distribution.mean()
+        std = self.models[-1].distribution.std()
+        y_range = np.linspace(mean-3*std, mean+3*std, n_vals)
+        n_lf = self.models[0].n_samples
+
+        cdf_var = np.zeros((n_lf, y_range.shape[0]))
+
+        print('')
+        for i in range(y_range.shape[0]):
+            print('CDF error bars %d / %d' % (i + 1, y_range.shape[0]))
+            for j in range(n_lf):
+                cdf_var[j, i] = stats.norm.cdf((y_range[i] - mu[j]) / (sigma[j]+1e-15)) - stats.norm.cdf(
+                    (y_range[i] - mu[j]) / (sigma[j]+1e-15)) ** 2
+
+        return np.mean(cdf_var, 0), y_range
+
+    def calculate_bmfmc_expectation(self, fun=lambda x: x):
+
+        if self.n_models > 2 or self.models[0].n_qoi > 1:
+            print('This only works for one low-fidelity model and one QoI.')
+            exit()
+
+        # Get regression model
+        regression_model = self.regression_models[-1]
+        x_pred = self.models[0].model_evals_pred
+        mu, sigma = regression_model.predict(x_pred, return_std=True)
+
+        # Approximate the expectation of fun(QoI)
+        n_lf = self.models[0].n_samples
+        exp_samples = np.zeros((n_lf, 1))
+
+        # Generate samples, get mean and average
+        for i in range(n_lf):
+            samples = np.random.randn(n_lf) * sigma[i] + mu[i]
+            samples = fun(samples)
+            exp_samples[i] = np.mean(samples, axis=0)
+
+        return np.mean(exp_samples, 0)
+
+    def calculate_bmfmc_expectation_estimator_variance(self, fun=lambda x: x):
+
+        if self.n_models > 2 or self.models[0].n_qoi > 1:
+            print('This only works for one low-fidelity model and one QoI.')
+            exit()
+
+        # Get regression model
+        regression_model = self.regression_models[-1]
+        x_pred = self.models[0].model_evals_pred
+        mu, sigma = regression_model.predict(x_pred, return_std=True)
+
+        # Approximate the variance of fun(QoI)
+        n_lf = self.models[0].n_samples
+        exp_var_samples = np.zeros((n_lf, 1))
+
+        # Generate samples, get variance and average
+        for i in range(n_lf):
+            samples = np.random.randn(n_lf) * sigma[i] + mu[i]
+            samples = fun(samples)
+            exp_var_samples[i] = np.var(samples, axis=0)
+
+        return np.mean(exp_var_samples, 0)
+
+    def calculate_bmfmc_density_expectation(self, val):
+
+        if self.n_models > 2 or self.models[0].n_qoi > 1:
+            print('This only works for one low-fidelity model and one QoI.')
+            exit()
+
+        # Get regression model
+        regression_model = self.regression_models[-1]
+        x_pred = self.models[0].model_evals_pred
+        mu, sigma = regression_model.predict(x_pred, return_std=True)
+
+        n_lf = self.models[0].n_samples
+        pdf_samples = np.zeros((n_lf, 1))
+
+        # Generate samples and average (2x)
+        for i in range(n_lf):
+            pdf_samples[i] = stats.norm(loc=mu[i], scale=sigma[i]).pdf(val)
+
+        return np.mean(pdf_samples, 0)
 
     # Print some stats
     def print_stats(self, mc=False):
