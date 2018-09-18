@@ -16,6 +16,8 @@ from sklearn.gaussian_process.kernels import Matern
 #   but we only consider the first QoI samples defined by the first column of this array.
 # - Parameter samples are "tagged" with the key pp and are a 10000×100 array.
 
+# QoIs:
+# - Pressure values at (0.0540, 0.5487), (0.8726,0.8518) and (0.3748,0.0505)
 
 def load_data():
     filepath = os.path.abspath(os.path.dirname(__file__))

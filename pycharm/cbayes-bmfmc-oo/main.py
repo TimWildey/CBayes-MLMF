@@ -12,6 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/models')
 # Model stuff
 import lambda_p
 import elliptic_pde
+import elliptic_pde_ml
 import ode_pp
 
 # Framework stuff
@@ -67,8 +68,9 @@ regression_type = 'decoupled_gaussian_processes'
 
 
 # Framework
-# todo: (!!!) develop BMFMC diagnostics
-# todo: (!!) check how to deal with the case where one has fixed evaluation points --> training_set_strategy: fixed
+# todo: (!!!) how to translate error estimates from one hierarchy to the next?
+# todo: (!!) implement BMFMC training / validation set error estimates
+# todo: (!!) check how to deal with the case where one has fixed evaluation points --> training_set_strategy: fixed --> preset model_evals during setup
 # todo: (!) enhance plotting: https://www.safaribooksonline.com/library/view/python-data-science/9781491912126/ch04.html
 # todo: (!) think about the case where one has several lowest-fidelity levels (for 1 QoI, this implies a regression model with two inputs and one output)
 
@@ -76,10 +78,13 @@ regression_type = 'decoupled_gaussian_processes'
 # todo: (!) implement transformations of random variables to operate in unconstrained probability space only
 
 # Regression
+# todo: (!!!) Create a generic regression model data type to allow for more freedom in the modeling
 # todo: (!!) Do a covariance / correlation check before choosing shared or separate kernels for the GPs
 # todo: (!) better regression for multiple QoIs (multi-output GPs would be an option)
 # todo: (!) GPs with non-Gaussian noise for asymmetric correlations
-# todo: (!) think about other regression models
+# todo: (!) PyMC: https://docs.pymc.io/notebooks/GP-MeansAndCovs.html
+# todo: (!) GPy: http://nbviewer.jupyter.org/github/SheffieldML/notebook/blob/master/GPy/index.ipynb
+# Check: Kernels for Vector-Valued Functions: a Review
 
 # Adaptive training
 # todo: (!) different options how to choose support covering samples: uniform grid / LHS / sparse grids
@@ -203,7 +208,7 @@ def get_prior_prior_pf_samples(n_samples):
             # Add bias
             lf_samples[:, 0] = np.sin(lf_samples[:, 0])
             if np.shape(lf_samples)[1] > 1:
-                lf_samples[:, 1:] = 1.5*np.sin(lf_samples[:, 1:])
+                lf_samples[:, 1:] = 1.5 * np.sin(lf_samples[:, 1:])
 
             lf_model = Model(eval_fun=lambda x: elliptic_pde.find_xy_pair(x, prior_samples, lf_samples),
                              rv_samples=prior_samples, rv_samples_pred=prior_samples, n_evals=n_samples, n_qoi=n_qoi,
@@ -216,6 +221,81 @@ def get_prior_prior_pf_samples(n_samples):
                              n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
             models = [lf_model, hf_model]
+
+    elif model in ['elliptic_pde_ml', 'elliptic_pde_ml_2d', 'elliptic_pde_ml_3d']:
+
+        # Setup and load data
+        if model == 'elliptic_pde_ml':
+            n_qoi = 1
+            obs_loc = [0.7]
+            obs_scale = [0.01]
+
+        elif model == 'elliptic_pde_ml_2d':
+            n_qoi = 2
+            obs_loc = [0.7, 0.1]
+            obs_scale = [0.01, 0.01]
+
+        elif model == 'elliptic_pde_ml_3d':
+            n_qoi = 3
+            obs_loc = [0.71, 0.12, 0.48]
+            obs_scale = [0.01, 0.01, 0.01]
+
+        h = 160 / 2 ** len(n_evals)
+        prior_pf_samples = elliptic_pde_ml.load_ml_data(h=h, n_models=len(n_evals) + 1)
+        prior_samples = np.reshape(range(n_samples), (n_samples, 1))  # we only need some id here
+
+        if pf_method == 'mc':
+
+            # Monte Carlo reference
+            prior_pf_samples = prior_pf_samples[-1][:, 0:n_qoi]
+            prior_pf_samples = np.reshape(prior_pf_samples, (1, n_samples, n_qoi))
+            prior_pf_mc_samples = prior_pf_samples
+
+        elif pf_method == 'bmfmc':
+
+            if len(n_evals) > 4:
+                print('elliptic_pde only supports 5 levels of fidelity.')
+                exit()
+
+            # Create a low-fidelity model
+            samples = prior_pf_samples[0][:, 0:n_qoi]
+            # samples = np.sin(samples)  # add a bias
+            lf_model = Model(
+                eval_fun=lambda x, samples=samples: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
+                rv_samples=prior_samples, rv_samples_pred=prior_samples, n_evals=n_samples, n_qoi=n_qoi,
+                rv_name='$q_0$', label='Low-fidelity')
+
+            # Create a high-fidelity model
+            samples = prior_pf_samples[-1][:, 0:n_qoi]
+            hf_model = Model(
+                eval_fun=lambda x, samples=samples: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
+                n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
+
+            if len(n_evals) == 2:
+                # Create a mid fidelity model
+                samples = prior_pf_samples[1][:, 0:n_qoi]
+                mf_model = Model(
+                    eval_fun=lambda x, samples=samples: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
+                    n_evals=n_evals[0], n_qoi=n_qoi, rv_name='$q_m$', label='Mid-fidelity')
+                models = [lf_model, mf_model, hf_model]
+
+            elif len(n_evals) > 2:
+                models = [lf_model]
+                for i in range(len(n_evals) - 1):
+                    samples = prior_pf_samples[i + 1][:, 0:n_qoi]
+                    models.append(
+                        Model(
+                            eval_fun=lambda x, samples=samples: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
+                            n_evals=n_evals[i], n_qoi=n_qoi, rv_name='$q_%d$' % int(i + 1),
+                            label='Mid-%d-fidelity' % int(i + 1)))
+                models.append(hf_model)
+
+            elif len(n_evals) == 1:
+                models = [lf_model, hf_model]
+
+            else:
+                print('Unsupported number of models for elliptic_pde_ml.')
+                exit()
 
     elif model == 'ode_pp':
 
