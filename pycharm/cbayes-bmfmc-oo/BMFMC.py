@@ -175,14 +175,13 @@ class BMFMC:
     # Calculate BMFMC estimator variance of the distribution mean
     def calculate_bmfmc_mean_estimator_variance(self):
 
-        if self.n_models > 2 or self.models[0].n_qoi > 1:
-            print('This only works for one low-fidelity model and one QoI.')
-            exit()
+        variance = 0.0
+        for i in range(self.n_models-1):
+            regression_model = self.regression_models[i]
+            sigma = regression_model.sigma
+            variance += np.mean(sigma ** 2, axis=0)
 
-        regression_model = self.regression_models[-1]
-        sigma = regression_model.sigma
-
-        return np.mean(sigma ** 2, axis=0)
+        return variance
 
     # Calculate the CDF
     def calculate_bmfmc_cdf(self, n_vals=10):
@@ -241,49 +240,34 @@ class BMFMC:
 
     def calculate_bmfmc_expectation(self, fun=lambda x: x):
 
-        if self.n_models > 2 or self.models[0].n_qoi > 1:
-            print('This only works for one low-fidelity model and one QoI.')
-            exit()
-
-        # Get regression model
-        regression_model = self.regression_models[-1]
-        mu = regression_model.mu
-        sigma = regression_model.sigma
-
-        # Approximate the expectation of fun(QoI)
-        n_lf = self.models[0].n_samples
-        exp_samples = np.zeros((n_lf, 1))
-
-        # Generate samples, get mean and average
-        for i in range(n_lf):
-            samples = np.random.randn(n_lf) * sigma[i] + mu[i]
-            samples = fun(samples)
-            exp_samples[i] = np.mean(samples, axis=0)
+        samples = self.models[-1].model_evals_pred
+        exp_samples = fun(samples)
 
         return np.mean(exp_samples, 0)
 
     def calculate_bmfmc_expectation_estimator_variance(self, fun=lambda x: x):
 
-        if self.n_models > 2 or self.models[0].n_qoi > 1:
-            print('This only works for one low-fidelity model and one QoI.')
-            exit()
+        variance = 0.0
+        for i in range(self.n_models-1):
+            # Get regression model
+            regression_model = self.regression_models[i]
+            mu = regression_model.mu
+            sigma = regression_model.sigma
 
-        # Get regression model
-        regression_model = self.regression_models[-1]
-        mu = regression_model.mu
-        sigma = regression_model.sigma
+            # Approximate the variance of fun(QoI)
+            n_lf = self.models[0].n_samples
+            n_qoi = self.models[0].n_qoi
+            exp_var_samples = np.zeros((n_lf, n_qoi))
 
-        # Approximate the variance of fun(QoI)
-        n_lf = self.models[0].n_samples
-        exp_var_samples = np.zeros((n_lf, 1))
+            # Generate samples, get variance and average
+            for j in range(n_lf):
+                samples = np.random.randn(n_lf, n_qoi) * sigma[j] + mu[j]
+                samples = fun(samples)
+                exp_var_samples[j] = np.var(samples, axis=0)
 
-        # Generate samples, get variance and average
-        for i in range(n_lf):
-            samples = np.random.randn(n_lf) * sigma[i] + mu[i]
-            samples = fun(samples)
-            exp_var_samples[i] = np.var(samples, axis=0)
+            variance += np.mean(exp_var_samples, 0)
 
-        return np.mean(exp_var_samples, 0)
+        return variance
 
     def calculate_bmfmc_density_expectation(self, val):
 
@@ -333,6 +317,9 @@ class BMFMC:
             print('')
         print('High-fidelity mean:\t\t\t\t%s' % self.models[-1].distribution.mean())
         print('High-fidelity std:\t\t\t\t%s' % self.models[-1].distribution.std())
+        print('Mean estimator std:\t\t\t\t%s' % np.sqrt(self.calculate_bmfmc_mean_estimator_variance()))
+        # mean = self.calculate_bmfmc_expectation(fun=lambda x: x)
+        # print('Std estimator std:\t\t\t\t%s' % np.sqrt(self.calculate_bmfmc_expectation_estimator_variance(fun=lambda x: (x - mean)**2)))
         print('')
         kl = self.models[-2].distribution.calculate_kl_divergence(self.models[-1].distribution)
         print('Relative information gain:\t\t%f' % kl)
