@@ -55,18 +55,20 @@ class Regression:
 
             hf_model_evals_pred = np.zeros((self.x_pred.shape[0], self.x_pred.shape[1]))
             regression_model = []
+            self.mu = np.zeros(self.x_pred.shape)
+            self.sigma = np.zeros(self.x_pred.shape)
             for k in range(self.x_train.shape[1]):
 
                 regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10))
                 regression_model[k].fit(np.expand_dims(self.x_train[:, k], axis=1), self.y_train[:, k])
 
                 # Predict q_l|q_l-1 at all low-fidelity samples
-                self.mu, self.sigma = regression_model[k].predict(np.expand_dims(self.x_pred[:, k], axis=1),
+                self.mu[:, k], self.sigma[:, k] = regression_model[k].predict(np.expand_dims(self.x_pred[:, k], axis=1),
                                                                   return_std=True)
 
                 # Generate high-fidelity samples from the predictions
                 for i in range(self.mu.shape[0]):
-                    hf_model_evals_pred[i, k] = self.mu[i] + self.sigma[i] * np.random.randn()
+                    hf_model_evals_pred[i, k] = self.mu[i, k] + self.sigma[i, k] * np.random.randn()
 
         elif self.regression_type == 'heteroscedastic_gaussian_process':
 
@@ -92,22 +94,23 @@ class Regression:
             # See here for more info: https://github.com/jmetzen/gp_extras/
             hf_model_evals_pred = np.zeros((self.x_pred.shape[0], self.x_pred.shape[1]))
             regression_model = []
+            self.mu = np.zeros(self.x_pred.shape)
+            self.sigma = np.zeros(self.x_pred.shape)
             for k in range(self.x_train.shape[1]):
                 prototypes = KMeans(n_clusters=5).fit(np.expand_dims(self.x_pred[:, k], axis=1)).cluster_centers_
-                kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1,
-                                                                  (0.01, 100.0)) + HeteroscedasticKernel.construct(
+                kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1, (0.01, 100.0)) + HeteroscedasticKernel.construct(
                     prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
 
                 regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10))
                 regression_model[k].fit(np.expand_dims(self.x_train[:, k], axis=1), self.y_train[:, k])
 
                 # Predict q_l|q_l-1 at all low-fidelity samples
-                self.mu, self.sigma = regression_model[k].predict(np.expand_dims(self.x_pred[:, k], axis=1),
+                self.mu[:, k], self.sigma[:, k] = regression_model[k].predict(np.expand_dims(self.x_pred[:, k], axis=1),
                                                                   return_std=True)
 
                 # Generate high-fidelity samples from the predictions
                 for i in range(self.mu.shape[0]):
-                    hf_model_evals_pred[i, k] = self.mu[i] + self.sigma[i] * np.random.randn()
+                    hf_model_evals_pred[i, k] = self.mu[i, k] + self.sigma[i, k] * np.random.randn()
 
         else:
             print('Unknown regression model %s.' % self.regression_type)
