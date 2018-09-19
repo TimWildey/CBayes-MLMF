@@ -72,8 +72,7 @@ regression_type = 'decoupled_gaussian_processes'
 
 
 # Framework
-# todo: (!!!) how to translate error estimates from one hierarchy to the next?
-# todo: (!!) implement BMFMC training / validation set error estimates
+# todo: (!) BMFMC CDF and density estimation for more than 1 QoI
 # todo: (!) enhance plotting: https://www.safaribooksonline.com/library/view/python-data-science/9781491912126/ch04.html
 # todo: (!) think about the case where one has several lowest-fidelity levels (for 1 QoI, this implies a regression model with two inputs and one output)
 

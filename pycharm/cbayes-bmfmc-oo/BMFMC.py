@@ -186,8 +186,8 @@ class BMFMC:
     # Calculate the CDF
     def calculate_bmfmc_cdf(self, n_vals=10):
 
-        if self.n_models > 2 or self.models[0].n_qoi > 1:
-            print('This only works for one low-fidelity model and one QoI.')
+        if self.models[0].n_qoi > 1:
+            print('This only works for one QoI so far...')
             exit()
 
         # Get regression model
@@ -196,9 +196,9 @@ class BMFMC:
         sigma = regression_model.sigma
 
         # Approximate CDF
-        mean = self.models[-1].distribution.mean()
-        std = self.models[-1].distribution.std()
-        y_range = np.linspace(mean - 3 * std, mean + 3 * std, n_vals)
+        min = np.min(self.models[-1].distribution.samples)
+        max = np.max(self.models[-1].distribution.samples)
+        y_range = np.linspace(min, max, n_vals)
         n_lf = self.models[0].n_samples
         cdf_samples = np.zeros((n_lf, y_range.shape[0]))
         print('')
@@ -212,31 +212,34 @@ class BMFMC:
     # Calculate CDF estimator error bars
     def calculate_bmfmc_cdf_estimator_variance(self, n_vals=10):
 
-        if self.n_models > 2 or self.models[0].n_qoi > 1:
-            print('This only works for one low-fidelity model and one QoI.')
+        if self.models[0].n_qoi > 1:
+            print('This only works for one QoI so far...')
             exit()
 
-        # Get regression model
-        regression_model = self.regression_models[-1]
-        mu = regression_model.mu
-        sigma = regression_model.sigma
+        variance = 0.0
+        min = np.percentile(self.models[-1].distribution.samples, 1)
+        max = np.percentile(self.models[-1].distribution.samples, 99)
+        y_range = np.linspace(min, max, n_vals)
+        for k in range(self.n_models-1):
+            # Get regression model
+            regression_model = self.regression_models[k]
+            mu = regression_model.mu
+            sigma = regression_model.sigma
 
-        # Approximate CDF
-        mean = self.models[-1].distribution.mean()
-        std = self.models[-1].distribution.std()
-        y_range = np.linspace(mean - 3 * std, mean + 3 * std, n_vals)
-        n_lf = self.models[0].n_samples
+            # Approximate CDF
+            n_lf = self.models[0].n_samples
+            cdf_var = np.zeros((n_lf, y_range.shape[0]))
 
-        cdf_var = np.zeros((n_lf, y_range.shape[0]))
+            print('')
+            for i in range(y_range.shape[0]):
+                print('CDF error bars (%d / %d), (%d / %d)' % (k+1, self.n_models-1, i + 1, y_range.shape[0]))
+                for j in range(n_lf):
+                    cdf_var[j, i] = stats.norm.cdf((y_range[i] - mu[j]) / (sigma[j] + 1e-15)) - stats.norm.cdf(
+                        (y_range[i] - mu[j]) / (sigma[j] + 1e-15)) ** 2
 
-        print('')
-        for i in range(y_range.shape[0]):
-            print('CDF error bars %d / %d' % (i + 1, y_range.shape[0]))
-            for j in range(n_lf):
-                cdf_var[j, i] = stats.norm.cdf((y_range[i] - mu[j]) / (sigma[j] + 1e-15)) - stats.norm.cdf(
-                    (y_range[i] - mu[j]) / (sigma[j] + 1e-15)) ** 2
+            variance += np.mean(cdf_var, 0)
 
-        return np.mean(cdf_var, 0), y_range
+        return variance, y_range
 
     def calculate_bmfmc_expectation(self, fun=lambda x: x):
 
@@ -271,8 +274,8 @@ class BMFMC:
 
     def calculate_bmfmc_density_expectation(self, val):
 
-        if self.n_models > 2 or self.models[0].n_qoi > 1:
-            print('This only works for one low-fidelity model and one QoI.')
+        if self.models[0].n_qoi > 1:
+            print('This only works for one QoI so far...')
             exit()
 
         # Get regression model
@@ -283,7 +286,7 @@ class BMFMC:
         n_lf = self.models[0].n_samples
         pdf_samples = np.zeros((n_lf, 1))
 
-        # Generate samples and average (2x)
+        # Generate samples and average
         for i in range(n_lf):
             pdf_samples[i] = stats.norm(loc=mu[i], scale=sigma[i]).pdf(val)
 
