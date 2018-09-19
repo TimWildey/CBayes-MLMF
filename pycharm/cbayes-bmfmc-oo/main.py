@@ -57,6 +57,7 @@ n_evals = [6**3]
 # Training set selection strategies:
 #   - support_covering / support_covering_adaptive
 #   - sampling / sampling_adaptive
+#   - fixed
 
 training_set_strategy = 'sampling'
 
@@ -95,7 +96,7 @@ regression_type = 'decoupled_gaussian_processes'
 
 
 def get_prior_prior_pf_samples(n_samples):
-    prior_samples = prior_pf_samples = obs_loc = obs_scale = prior_pf_mc_samples = mc_model = None
+    prior_samples = prior_pf_samples = obs_loc = obs_scale = prior_pf_mc_samples = mc_model = n_qoi = None
 
     # Check push forward method
     if pf_method not in ['mc', 'bmfmc']:
@@ -301,17 +302,17 @@ def get_prior_prior_pf_samples(n_samples):
     elif model in ['elliptic_pde_ml_fixed', 'elliptic_pde_ml_fixed_2d', 'elliptic_pde_ml_fixed_3d']:
 
         # Setup and load data
-        if model == 'elliptic_pde_ml':
+        if model == 'elliptic_pde_ml_fixed':
             n_qoi = 1
             obs_loc = [0.7]
             obs_scale = [0.01]
 
-        elif model == 'elliptic_pde_ml_2d':
+        elif model == 'elliptic_pde_ml_fixed_2d':
             n_qoi = 2
             obs_loc = [0.7, 0.1]
             obs_scale = [0.01, 0.01]
 
-        elif model == 'elliptic_pde_ml_3d':
+        elif model == 'elliptic_pde_ml_fixed_3d':
             n_qoi = 3
             obs_loc = [0.71, 0.12, 0.48]
             obs_scale = [0.01, 0.01, 0.01]
@@ -363,7 +364,7 @@ def get_prior_prior_pf_samples(n_samples):
                         rv_samples=prior_samples[0:n_evals[i], :], rv_samples_pred=prior_samples, n_evals=n_evals[i],
                         n_qoi=n_qoi, rv_name='$q_%d$' % int(i + 1),
                         label='Mid-%d-fidelity' % int(i + 1)))
-                models[i+1].set_model_evals(prior_pf_samples[i + 1][:, 0:n_qoi])
+                models[i + 1].set_model_evals(prior_pf_samples[i + 1][:, 0:n_qoi])
             models.append(hf_model)
 
         elif len(n_evals) == 1:
