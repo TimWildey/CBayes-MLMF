@@ -659,6 +659,8 @@ if __name__ == '__main__':
         kls = np.zeros((len(n_evals) + 1))
         kls[-1] = cbayes_post.get_prior_post_kl()
 
+        cbayes_post.plot_posterior(fignum=5, color='C%d' % len(n_evals), label='High-fidelity')
+
         # Create low-fidelity CBayes posteriors
         for i in range(len(n_evals)):
             print('Evaluating the low-fidelity posteriors %d / %d ...' % (i + 1, len(n_evals)))
@@ -666,6 +668,7 @@ if __name__ == '__main__':
             cbayes_post_lf = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_lf)
             cbayes_post_lf.setup_posterior_and_pf()
             cbayes_post_lf.print_stats()
+            cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Low-fidelity %d / %d' % (i+1, len(n_evals)))
             kls[i] = cbayes_post_lf.get_prior_post_kl()
             if i == 0:
                 cbayes_post_lf.plot_results(model_tag='lf')
@@ -682,6 +685,9 @@ if __name__ == '__main__':
         cbayes_post_mc.print_stats()
         mc_kl = cbayes_post_mc.get_prior_post_kl()
         cbayes_post_mc.plot_results(model_tag='mc')
+
+        cbayes_post_mc.plot_posterior(fignum=5, color='k', linestyle='--', label='MC reference')
+        plt.gcf().savefig('pngout/cbayes_post_densities.png', dpi=300)
 
         end = time.time()
         print('(Monte Carlo CBayes elapsed time: %fs)\n' % (end - lap))

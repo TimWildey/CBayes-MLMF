@@ -147,10 +147,19 @@ class CBayesPosterior:
 
         # Plot some bivariate distributions
         if self.p_obs.n_dim == 2 and model_tag == 'hf':
-                self.p_obs.plot_kde(title='Observed density')
-                plt.gcf().savefig('pngout/cbayes_dists_obs.png', dpi=300)
-                plt.clf()
-                self.p_post_pf.plot_kde(title='Posterior push-forward')
-                plt.gcf().savefig('pngout/cbayes_dists_hf_post_pf.png', dpi=300)
+            self.p_obs.plot_kde(title='Observed density')
+            plt.gcf().savefig('pngout/cbayes_dists_obs.png', dpi=300)
+            plt.clf()
+            self.p_post_pf.plot_kde(title='Posterior push-forward')
+            plt.gcf().savefig('pngout/cbayes_dists_hf_post_pf.png', dpi=300)
 
         plt.clf()
+
+    # Plot posterior
+    def plot_posterior(self, fignum=1, color='C0', linestyle='-', label='Posterior'):
+
+        # Plot the posterior only if the input space is one-dimensional
+        if self.p_obs.n_dim == 1 and self.p_post.n_dim == 1:
+            self.p_post.create_kernel_density()
+            self.p_post.plot_kde(fignum=fignum, title='Posterior densities', color=color, linestyle=linestyle,
+                                 label=label)

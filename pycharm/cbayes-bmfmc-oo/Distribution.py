@@ -52,6 +52,16 @@ class Distribution:
     def std(self):
         return np.std(self.samples, 0)
 
+    # Create a kernel density from the distribution samples
+    def create_kernel_density(self):
+        if self.kernel_density is not None:
+            warnings.warn('Found existing kernel density. Overwriting.')
+        elif self.n_dim < 4:
+            self.kernel_density = gkde(np.squeeze(self.samples).T)
+        else:
+            print('Attempting KDE in %d dimensions. Aborting.' % self.n_dim)
+            exit()
+
     # Evaluate the kernel density at the distribution samples
     def eval_kernel_density(self):
         if self.kernel_density is None:
@@ -74,9 +84,11 @@ class Distribution:
         return kl
 
     # Plot the KDE density
-    def plot_kde(self, fignum=1, color='C0', linestyle='-', xmin=0.0, xmax=1.0, title='KDE'):
+    def plot_kde(self, fignum=1, color='C0', linestyle='-', xmin=0.0, xmax=1.0, title='KDE', label=None):
+        if label is None:
+            label = self.label
         if self.n_dim == 1:
-            utils.plot_1d_kde(qkde=self.kernel_density, xmin=xmin, xmax=xmax, label=self.label, linestyle=linestyle,
+            utils.plot_1d_kde(qkde=self.kernel_density, xmin=xmin, xmax=xmax, label=label, linestyle=linestyle,
                               num=fignum, xlabel=self.rv_name, ylabel='$p($' + self.rv_name + '$)$', color=color,
                               title=title)
         elif self.n_dim == 2:
