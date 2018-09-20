@@ -35,7 +35,7 @@ class Regression:
         if self.regression_type == 'gaussian_process':
 
             # Fit a GP regression model to approximate p(q_l|q_l-1)
-            kernel = ConstantKernel() * RBF() + WhiteKernel() + ConstantKernel()
+            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(1.0, (1e-2, 1e2)) + WhiteKernel() + ConstantKernel()
             # kernel = Matern() + WhiteKernel()
             regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
             regression_model.fit(self.x_train, self.y_train)
@@ -51,7 +51,7 @@ class Regression:
         elif self.regression_type == 'decoupled_gaussian_processes':
 
             # Fit a GP regression model to approximate p(q_l|q_l-1)
-            kernel = ConstantKernel() * RBF() + WhiteKernel() + ConstantKernel()
+            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(1.0, (1e-2, 1e2)) + WhiteKernel() + ConstantKernel()
 
             hf_model_evals_pred = np.zeros((self.x_pred.shape[0], self.x_pred.shape[1]))
             regression_model = []
@@ -64,7 +64,7 @@ class Regression:
 
                 # Predict q_l|q_l-1 at all low-fidelity samples
                 self.mu[:, k], self.sigma[:, k] = regression_model[k].predict(np.expand_dims(self.x_pred[:, k], axis=1),
-                                                                  return_std=True)
+                                                                              return_std=True)
 
                 # Generate high-fidelity samples from the predictions
                 for i in range(self.mu.shape[0]):
@@ -75,7 +75,7 @@ class Regression:
             # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
             # See here for more info: https://github.com/jmetzen/gp_extras/
             prototypes = KMeans(n_clusters=5).fit(self.x_train).cluster_centers_
-            kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1, (0.01, 100.0)) + HeteroscedasticKernel.construct(
+            kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1.0, (0.01, 100.0)) + HeteroscedasticKernel.construct(
                 prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
             regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
             regression_model.fit(self.x_train, self.y_train)
@@ -98,7 +98,7 @@ class Regression:
             self.sigma = np.zeros(self.x_pred.shape)
             for k in range(self.x_train.shape[1]):
                 prototypes = KMeans(n_clusters=5).fit(np.expand_dims(self.x_pred[:, k], axis=1)).cluster_centers_
-                kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1, (0.01, 100.0)) + HeteroscedasticKernel.construct(
+                kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1.0, (0.01, 100.0)) + HeteroscedasticKernel.construct(
                     prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
 
                 regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10))
@@ -106,7 +106,7 @@ class Regression:
 
                 # Predict q_l|q_l-1 at all low-fidelity samples
                 self.mu[:, k], self.sigma[:, k] = regression_model[k].predict(np.expand_dims(self.x_pred[:, k], axis=1),
-                                                                  return_std=True)
+                                                                              return_std=True)
 
                 # Generate high-fidelity samples from the predictions
                 for i in range(self.mu.shape[0]):
