@@ -28,9 +28,9 @@ regression_type = 'gaussian_process'
 
 if __name__ == '__main__':
 
-    n_evals_mc = np.logspace(np.log10(50), np.log10(2000), 10)
+    n_evals_mc = np.logspace(np.log10(50), np.log10(2000), 15)
     n_evals_mc = np.round(n_evals_mc).astype(int)
-    n_evals_bmfmc = np.logspace(np.log10(5), np.log10(200), 10)
+    n_evals_bmfmc = np.logspace(np.log10(10), np.log10(200), 10)
     n_evals_bmfmc = np.round(n_evals_bmfmc).astype(int)
     n_evals_all = n_evals_mc.tolist() + list(set(n_evals_bmfmc.tolist()) - set(n_evals_mc.tolist()))
     n_evals_all.sort()
@@ -163,7 +163,7 @@ if __name__ == '__main__':
     kls_post_1hf_2lf = []
     kls_prior_pf_1hf_2lf = []
     for idx, n_evals in enumerate(n_evals_bmfmc):
-        n_evals = [4*n_evals, n_evals]
+        n_evals = [2*n_evals, n_evals]
         print('\nCalculating BMFMC multi-model %d / %d ...' % (idx + 1, len(n_evals_bmfmc)))
 
         # Create a low-fidelity model
