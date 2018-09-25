@@ -263,7 +263,7 @@ class BMFMC:
 
         if self.n_models > 2:
             warnings.warn(
-                'This is a very rough estimate for more than 2 low-fidelity models.'
+                'This is a very rough estimate for more than 2 low-fidelity models. '
                 'Use the more general calculate_bmfmc_expectation_estimator_variance() to obtain an accurate estimate.')
 
         variance = 0.0
@@ -303,7 +303,7 @@ class BMFMC:
 
         for i in range(n_lf):
             if i % 100 == 0:
-                print('Sample %d / %d', (i, n_lf))
+                print('Sample %d / %d' % (i, n_lf))
 
             samples = np.random.randn(n_lf, n_qoi) * sigma[i] + mu[i]
 
