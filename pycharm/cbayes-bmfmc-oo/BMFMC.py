@@ -178,7 +178,7 @@ class BMFMC:
 
         if self.n_models > 2:
             warnings.warn(
-                'This is a very rough estimate for more than 2 low-fidelity models.'
+                'This is a very rough estimate for more than 2 low-fidelity models. '
                 'Use the more general calculate_bmfmc_expectation_estimator_variance() to obtain an accurate estimate.')
 
         variance = 0.0
@@ -224,7 +224,7 @@ class BMFMC:
 
         if self.n_models > 2:
             warnings.warn(
-                'This is a very rough estimate for more than 2 low-fidelity models.'
+                'This is a very rough estimate for more than 2 low-fidelity models. '
                 'Use the more general calculate_bmfmc_expectation_estimator_variance() to obtain an accurate estimate.')
 
         variance = 0.0
@@ -288,22 +288,28 @@ class BMFMC:
 
         return variance
 
-    def calculate_bmfmc_expectation_estimator_variance(self, fun=lambda x: x):
+    def calculate_bmfmc_expectation_estimator_variance(self, fun=lambda x: x, stride=1):
 
-        if self.n_models > 2:
+        if self.n_models > 2 and stride is 1:
             warnings.warn(
                 'Calculating BMFMC estimator variance. This can take a while for more than one low-fidelity model.')
 
         regression_model = self.regression_models[0]
         mu = regression_model.mu
         sigma = regression_model.sigma
-        n_lf = self.models[0].n_samples
         n_qoi = self.models[0].n_qoi
+
+        mu = mu[::stride]
+        sigma = sigma[::stride]
+        n_lf = np.shape(mu)[0]
+
         exp_var_samples = np.zeros((n_lf, n_qoi))
 
         for i in range(n_lf):
-            if i % 100 == 0:
-                print('Sample %d / %d' % (i, n_lf))
+            if self.n_models > 2 and i % 100 == 0:
+                print('\r(%d / %d) ' % (i, n_lf), end='')
+            elif self.n_models > 2 and i == n_lf-1:
+                print('\r', end='')
 
             samples = np.random.randn(n_lf, n_qoi) * sigma[i] + mu[i]
 
@@ -366,12 +372,14 @@ class BMFMC:
         print('High-fidelity mean:\t\t\t\t%s' % self.models[-1].distribution.mean())
         print('High-fidelity std:\t\t\t\t%s' % self.models[-1].distribution.std())
         print('')
-        bmfmc_error = np.sqrt(self.calculate_bmfmc_mean_estimator_variance())
+        # bmfmc_error = np.sqrt(self.calculate_bmfmc_mean_estimator_variance())
+        # print('BMFMC mean estimator std apprx:\t%s' % bmfmc_error)
+        bmfmc_error = np.sqrt(self.calculate_bmfmc_expectation_estimator_variance(fun=lambda x: x, stride=10))
         print('BMFMC mean estimator std:\t\t%s' % bmfmc_error)
         mc_error = np.sqrt(np.var(self.models[-1].model_evals, axis=0) / self.models[-1].n_evals)
         print('MC mean estimator std:\t\t\t%s' % mc_error)
         # mean = self.calculate_bmfmc_expectation(fun=lambda x: x)
-        # print('Std estimator std:\t\t\t\t%s' % np.sqrt(self.calculate_bmfmc_expectation_estimator_variance(fun=lambda x: (x - mean)**2)))
+        # print('Std estimator std:\t\t\t\t%s' % np.sqrt(self.calculate_bmfmc_expectation_estimator_variance(fun=lambda x: (x - mean)**2, stride=10)))
         print('')
         kl = self.models[-2].distribution.calculate_kl_divergence(self.models[-1].distribution)
         print('Relative information gain:\t\t%f' % kl)
