@@ -31,9 +31,9 @@ n_samples = int(1e4)
 
 # Forward models:
 #   - lambda_p
-#   - ellptic_pde / elliptic_pde_2d / elliptic_pde_3d
-#   - ellptic_pde_ml / elliptic_pde_ml_2d / elliptic_pde_ml_3d
-#   - ellptic_pde_ml_fixed / elliptic_pde_ml_fixed_2d / elliptic_pde_ml_fixed_3d
+#   - elliptic_pde / elliptic_pde_2d / elliptic_pde_3d
+#   - elliptic_pde_ml / elliptic_pde_ml_2d / elliptic_pde_ml_3d
+#   - elliptic_pde_ml_fixed / elliptic_pde_ml_fixed_2d / elliptic_pde_ml_fixed_3d
 #   - ode_pp /  ode_pp_2d
 
 model = 'elliptic_pde_3d'
@@ -129,9 +129,14 @@ def get_prior_prior_pf_samples(n_samples):
                              rv_name='$q_0$', label='Low-fidelity')
 
             # Create a high-fidelity model
-            hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, len(n_evals) * 2 + 1), n_evals=n_evals[-1],
-                             n_qoi=n_qoi,
-                             rv_name='$Q$', label='High-fidelity')
+            if len(n_evals) == 1:
+                hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 5), n_evals=n_evals[-1],
+                                 n_qoi=n_qoi,
+                                 rv_name='$Q$', label='High-fidelity')
+            else:
+                hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, len(n_evals) * 2 + 1), n_evals=n_evals[-1],
+                                 n_qoi=n_qoi,
+                                 rv_name='$Q$', label='High-fidelity')
 
             if len(n_evals) == 2:
                 # Create a mid fidelity model
@@ -686,8 +691,7 @@ if __name__ == '__main__':
         mc_kl = cbayes_post_mc.get_prior_post_kl()
         cbayes_post_mc.plot_results(model_tag='mc')
 
-        cbayes_post_mc.plot_posterior(fignum=5, color='k', linestyle='--', label='MC reference')
-        plt.gcf().savefig('pngout/cbayes_post_densities.png', dpi=300)
+        cbayes_post_mc.plot_posterior(fignum=5, color='k', linestyle='--', label='MC reference', save_fig=True)
 
         end = time.time()
         print('(Monte Carlo CBayes elapsed time: %fs)\n' % (end - lap))

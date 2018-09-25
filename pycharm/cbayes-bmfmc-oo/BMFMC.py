@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import scipy.stats as stats
+import warnings
 
 import utils
 from Model import Model
@@ -175,8 +176,13 @@ class BMFMC:
     # Calculate BMFMC estimator variance of the distribution mean
     def calculate_bmfmc_mean_estimator_variance(self):
 
+        if self.n_models > 2:
+            warnings.warn(
+                'This is a very rough estimate for more than 2 low-fidelity models.'
+                'Use the more general calculate_bmfmc_expectation_estimator_variance() to obtain an accurate estimate.')
+
         variance = 0.0
-        for i in range(self.n_models-1):
+        for i in range(self.n_models - 1):
             regression_model = self.regression_models[i]
             sigma = regression_model.sigma
             variance += np.mean(sigma ** 2, axis=0)
@@ -216,11 +222,16 @@ class BMFMC:
             print('This only works for one QoI so far...')
             exit()
 
+        if self.n_models > 2:
+            warnings.warn(
+                'This is a very rough estimate for more than 2 low-fidelity models.'
+                'Use the more general calculate_bmfmc_expectation_estimator_variance() to obtain an accurate estimate.')
+
         variance = 0.0
         min = np.percentile(self.models[-1].distribution.samples, 1)
         max = np.percentile(self.models[-1].distribution.samples, 99)
         y_range = np.linspace(min, max, n_vals)
-        for k in range(self.n_models-1):
+        for k in range(self.n_models - 1):
             # Get regression model
             regression_model = self.regression_models[k]
             mu = regression_model.mu
@@ -232,7 +243,7 @@ class BMFMC:
 
             print('')
             for i in range(y_range.shape[0]):
-                print('CDF error bars (%d / %d), (%d / %d)' % (k+1, self.n_models-1, i + 1, y_range.shape[0]))
+                print('CDF error bars (%d / %d), (%d / %d)' % (k + 1, self.n_models - 1, i + 1, y_range.shape[0]))
                 for j in range(n_lf):
                     cdf_var[j, i] = stats.norm.cdf((y_range[i] - mu[j]) / (sigma[j] + 1e-15)) - stats.norm.cdf(
                         (y_range[i] - mu[j]) / (sigma[j] + 1e-15)) ** 2
@@ -248,7 +259,12 @@ class BMFMC:
 
         return np.mean(exp_samples, 0)
 
-    def calculate_bmfmc_expectation_estimator_variance(self, fun=lambda x: x):
+    def calculate_bmfmc_expectation_estimator_variance_approx(self, fun=lambda x: x):
+
+        if self.n_models > 2:
+            warnings.warn(
+                'This is a very rough estimate for more than 2 low-fidelity models.'
+                'Use the more general calculate_bmfmc_expectation_estimator_variance() to obtain an accurate estimate.')
 
         variance = 0.0
         for i in range(self.n_models-1):
@@ -269,6 +285,35 @@ class BMFMC:
                 exp_var_samples[j] = np.var(samples, axis=0)
 
             variance += np.mean(exp_var_samples, 0)
+
+        return variance
+
+    def calculate_bmfmc_expectation_estimator_variance(self, fun=lambda x: x):
+
+        if self.n_models > 2:
+            warnings.warn(
+                'Calculating BMFMC estimator variance. This can take a while for more than one low-fidelity model.')
+
+        regression_model = self.regression_models[0]
+        mu = regression_model.mu
+        sigma = regression_model.sigma
+        n_lf = self.models[0].n_samples
+        n_qoi = self.models[0].n_qoi
+        exp_var_samples = np.zeros((n_lf, n_qoi))
+
+        for i in range(n_lf):
+            if i % 100 == 0:
+                print('Sample %d / %d', (i, n_lf))
+
+            samples = np.random.randn(n_lf, n_qoi) * sigma[i] + mu[i]
+
+            for j in range(1, self.n_models - 1):
+                samples = self.regression_models[j].predict_and_sample(x_pred=samples)
+
+            samples = fun(samples)
+            exp_var_samples[i] = np.var(samples, axis=0)
+
+        variance = np.mean(exp_var_samples, 0)
 
         return variance
 
@@ -320,7 +365,11 @@ class BMFMC:
             print('')
         print('High-fidelity mean:\t\t\t\t%s' % self.models[-1].distribution.mean())
         print('High-fidelity std:\t\t\t\t%s' % self.models[-1].distribution.std())
-        print('Mean estimator std:\t\t\t\t%s' % np.sqrt(self.calculate_bmfmc_mean_estimator_variance()))
+        print('')
+        bmfmc_error = np.sqrt(self.calculate_bmfmc_mean_estimator_variance())
+        print('BMFMC mean estimator std:\t\t%s' % bmfmc_error)
+        mc_error = np.sqrt(np.var(self.models[-1].model_evals, axis=0) / self.models[-1].n_evals)
+        print('MC mean estimator std:\t\t\t%s' % mc_error)
         # mean = self.calculate_bmfmc_expectation(fun=lambda x: x)
         # print('Std estimator std:\t\t\t\t%s' % np.sqrt(self.calculate_bmfmc_expectation_estimator_variance(fun=lambda x: (x - mean)**2)))
         print('')
