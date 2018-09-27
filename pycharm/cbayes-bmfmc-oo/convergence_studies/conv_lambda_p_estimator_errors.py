@@ -91,7 +91,8 @@ if __name__ == '__main__':
         prior_pf_samples = bmfmc.get_samples()[-1, :, :]
 
         # BMFMC error
-        bmfmc_error.append(np.sqrt(bmfmc.calculate_bmfmc_mean_estimator_variance()))
+        bmfmc_error.append(
+            np.sqrt(bmfmc.calculate_bmfmc_mean_estimator_variance()))
         bmfmc_mean.append(np.mean(prior_pf_samples))
 
     # -------------- BMFMC 2 lf
@@ -99,7 +100,7 @@ if __name__ == '__main__':
     bmfmc2_error = []
     bmfmc2_mean = []
     for idx, n_evals in enumerate(n_evals_bmfmc):
-        n_evals = [2*n_evals, n_evals]
+        n_evals = [2 * n_evals, n_evals]
         print('\nCalculating BMFMC model %d / %d ...' % (idx + 1, len(n_evals_bmfmc)))
 
         # Create a low-fidelity model
@@ -126,7 +127,8 @@ if __name__ == '__main__':
         prior_pf_samples = bmfmc.get_samples()[-1, :, :]
 
         # BMFMC error
-        bmfmc2_error.append(np.sqrt(bmfmc.calculate_bmfmc_mean_estimator_variance()))
+        bmfmc2_error.append(
+            np.sqrt(bmfmc.calculate_bmfmc_mean_estimator_variance()))
         bmfmc2_mean.append(np.mean(prior_pf_samples))
 
     mc_error = np.array(mc_error)
@@ -145,6 +147,7 @@ if __name__ == '__main__':
     plt.xlabel('No. high-fidelity samples')
     plt.ylabel('Estimator error')
     plt.legend(loc='upper right')
+    plt.grid(b=True)
     plt.gcf().savefig('lambda_p_estimator_errors.png', dpi=300)
 
     plt.figure()
@@ -161,6 +164,7 @@ if __name__ == '__main__':
     plt.xlabel('No. high-fidelity samples')
     plt.ylabel('Mean + error bounds')
     plt.legend(loc='upper right')
+    plt.grid(b=True)
     plt.gcf().savefig('lambda_p_estimator_mean.png', dpi=300)
 
 # --------------------------------------------------------------------------- #
