@@ -37,7 +37,8 @@ class Regression:
         if self.regression_type == 'gaussian_process':
 
             # Fit a GP regression model to approximate p(q_l|q_l-1)
-            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(1.0, (1e-2, 1e2)) + WhiteKernel() + ConstantKernel()
+            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(np.ones(self.y_train.shape[1]),
+                                                             (1e-2, 1e2)) + WhiteKernel() + ConstantKernel()
             # kernel = Matern() + WhiteKernel()
             self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
             self.regression_model.fit(self.x_train, self.y_train)
@@ -54,7 +55,8 @@ class Regression:
         elif self.regression_type == 'decoupled_gaussian_processes':
 
             # Fit a GP regression model to approximate p(q_l|q_l-1)
-            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(1.0, (1e-2, 1e2)) + WhiteKernel() + ConstantKernel()
+            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(1.0, (1e-2, 1e2)) + WhiteKernel() + ConstantKernel(1.0,
+                                                                                                           (1e-10, 1e3))
 
             hf_model_evals_pred = np.zeros((self.x_pred.shape[0], self.x_pred.shape[1]))
             self.regression_model = []
@@ -78,9 +80,10 @@ class Regression:
 
             # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
             # See here for more info: https://github.com/jmetzen/gp_extras/
-            prototypes = KMeans(n_clusters=5).fit(self.x_train).cluster_centers_
-            kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1.0, (0.01, 100.0)) + HeteroscedasticKernel.construct(
-                prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
+            prototypes = KMeans(n_clusters=10).fit(self.x_train).cluster_centers_
+            kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(np.ones(self.y_train.shape[1]),
+                                                              (0.01, 100.0)) + HeteroscedasticKernel.construct(
+                prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed") + ConstantKernel(1.0, (1e-10, 1e3))
             self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
             self.regression_model.fit(self.x_train, self.y_train)
 
@@ -104,7 +107,8 @@ class Regression:
             for k in range(self.x_train.shape[1]):
                 prototypes = KMeans(n_clusters=5).fit(np.expand_dims(self.x_pred[:, k], axis=1)).cluster_centers_
                 kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1.0, (0.01, 100.0)) + HeteroscedasticKernel.construct(
-                    prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
+                    prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed") + ConstantKernel(1.0,
+                                                                                                       (1e-10, 1e3))
 
                 self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10))
                 self.regression_model[k].fit(np.expand_dims(self.x_train[:, k], axis=1), self.y_train[:, k])
@@ -146,30 +150,35 @@ class Regression:
                 # Create a uniform grid across the support of p(q)
 
                 if hf_model.n_qoi is 1:
-                    x_train_linspace = np.linspace(lf_model.model_evals_pred[:, 0].min(),
-                                                   lf_model.model_evals_pred[:, 0].max(),
-                                                   num=hf_model.n_evals)
+                    sup_min = np.percentile(lf_model.model_evals_pred[:, 0], 1)
+                    sup_max = np.percentile(lf_model.model_evals_pred[:, 0], 99)
+                    x_train_linspace = np.linspace(sup_min, sup_max, num=hf_model.n_evals)
                     x_train_linspace = np.reshape(x_train_linspace, (hf_model.n_evals, hf_model.n_qoi))
 
                 elif hf_model.n_qoi is 2:
                     ab_num = int(np.sqrt(hf_model.n_evals))
                     hf_model.n_evals = ab_num ** 2
-                    a = np.linspace(lf_model.model_evals_pred[:, 0].min(), lf_model.model_evals_pred[:, 0].max(),
-                                    num=ab_num)
-                    b = np.linspace(lf_model.model_evals_pred[:, 1].min(), lf_model.model_evals_pred[:, 1].max(),
-                                    num=ab_num)
+                    sup_min = np.percentile(lf_model.model_evals_pred[:, 0], 1)
+                    sup_max = np.percentile(lf_model.model_evals_pred[:, 0], 99)
+                    a = np.linspace(sup_min, sup_max, num=ab_num)
+                    sup_min = np.percentile(lf_model.model_evals_pred[:, 1], 1)
+                    sup_max = np.percentile(lf_model.model_evals_pred[:, 1], 99)
+                    b = np.linspace(sup_min, sup_max, num=ab_num)
                     aa, bb = np.meshgrid(a, b)
                     x_train_linspace = np.reshape(np.vstack([aa, bb]), (2, hf_model.n_evals)).T
 
                 elif hf_model.n_qoi is 3:
                     abc_num = int(np.power(hf_model.n_evals, 1. / 3))
                     hf_model.n_evals = abc_num ** 3
-                    a = np.linspace(lf_model.model_evals_pred[:, 0].min(), lf_model.model_evals_pred[:, 0].max(),
-                                    num=abc_num)
-                    b = np.linspace(lf_model.model_evals_pred[:, 1].min(), lf_model.model_evals_pred[:, 1].max(),
-                                    num=abc_num)
-                    c = np.linspace(lf_model.model_evals_pred[:, 2].min(), lf_model.model_evals_pred[:, 2].max(),
-                                    num=abc_num)
+                    sup_min = np.percentile(lf_model.model_evals_pred[:, 0], 1)
+                    sup_max = np.percentile(lf_model.model_evals_pred[:, 0], 99)
+                    a = np.linspace(sup_min, sup_max, num=abc_num)
+                    sup_min = np.percentile(lf_model.model_evals_pred[:, 1], 1)
+                    sup_max = np.percentile(lf_model.model_evals_pred[:, 1], 99)
+                    b = np.linspace(sup_min, sup_max, num=abc_num)
+                    sup_min = np.percentile(lf_model.model_evals_pred[:, 2], 1)
+                    sup_max = np.percentile(lf_model.model_evals_pred[:, 2], 99)
+                    c = np.linspace(sup_min, sup_max, num=abc_num)
                     aa, bb, cc = np.meshgrid(a, b, c)
                     x_train_linspace = np.reshape(np.vstack([aa, bb, cc]), (3, hf_model.n_evals)).T
 
@@ -278,14 +287,14 @@ class Regression:
 
         elif self.regression_type == 'decoupled_gaussian_processes':
 
-            hf_model_evals_pred = np.zeros((self.x_pred.shape[0], self.x_pred.shape[1]))
-            mu = np.zeros(self.x_pred.shape)
-            sigma = np.zeros(self.x_pred.shape)
+            hf_model_evals_pred = np.zeros((x_pred.shape[0], x_pred.shape[1]))
+            mu = np.zeros(x_pred.shape)
+            sigma = np.zeros(x_pred.shape)
 
             for k in range(self.x_train.shape[1]):
                 # Predict q_l|q_l-1 at all low-fidelity samples
                 mu[:, k], sigma[:, k] = self.regression_model[k].predict(np.expand_dims(x_pred[:, k], axis=1),
-                                                                    return_std=True)
+                                                                         return_std=True)
 
                 # Generate high-fidelity samples from the predictions
                 for i in range(mu.shape[0]):
@@ -304,9 +313,9 @@ class Regression:
 
         elif self.regression_type == 'decoupled_heteroscedastic_gaussian_process':
 
-            hf_model_evals_pred = np.zeros((self.x_pred.shape[0], self.x_pred.shape[1]))
-            mu = np.zeros(self.x_pred.shape)
-            sigma = np.zeros(self.x_pred.shape)
+            hf_model_evals_pred = np.zeros((x_pred.shape[0], x_pred.shape[1]))
+            mu = np.zeros(x_pred.shape)
+            sigma = np.zeros(x_pred.shape)
 
             for k in range(self.x_train.shape[1]):
                 # Predict q_l|q_l-1 at all low-fidelity samples

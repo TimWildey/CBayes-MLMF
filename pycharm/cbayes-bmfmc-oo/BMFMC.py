@@ -176,7 +176,7 @@ class BMFMC:
     # Calculate BMFMC estimator variance of the distribution mean
     def calculate_bmfmc_mean_estimator_variance(self):
 
-        if self.n_models == 2:
+        if self.n_models == 2 and self.models[0].n_qoi == 1:
             regression_model = self.regression_models[0]
             sigma = regression_model.sigma
             return np.mean(sigma ** 2, axis=0)
@@ -197,8 +197,8 @@ class BMFMC:
         sigma = regression_model.sigma
 
         # Approximate CDF
-        min = np.min(self.models[-1].distribution.samples)
-        max = np.max(self.models[-1].distribution.samples)
+        min = np.percentile(self.models[-1].distribution.samples, 1)
+        max = np.percentile(self.models[-1].distribution.samples, 99)
         y_range = np.linspace(min, max, n_vals)
         n_lf = self.models[0].n_samples
         cdf_samples = np.zeros((n_lf, y_range.shape[0]))
@@ -285,7 +285,7 @@ class BMFMC:
             samples = None
 
             # Iterate until the MC error is acceptable
-            while (np.abs(mc_mean) + mc_error + 1e-15) / (np.abs(mc_mean) + 1e-15) > (1 + tol) and j < j_max:
+            while ((np.abs(mc_mean) + mc_error + 1e-15) / (np.abs(mc_mean) + 1e-15) > (1 + tol)).all() and j < j_max:
 
                 # Create samples given q_i
                 samples_j = np.random.randn(n_lf_i, n_qoi) * sigma[i] + mu[i]
