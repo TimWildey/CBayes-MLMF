@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 # - Pressure values at (0.0540, 0.5487), (0.8726,0.8518) and (0.3748,0.0505)
 
 
-def load_ml_data(h=10, n_models=2):
+def load_data(h=10, n_models=2):
     filepath = os.path.abspath(os.path.dirname(__file__))
     qvals = []
 
@@ -40,7 +40,7 @@ def find_xy_pair(x, X, Y):
 if __name__ == '__main__':
 
     # Load data, h_min: 10, h_max: 160
-    qvals = load_ml_data(h=20, n_models=4)
+    qvals = load_data(h=20, n_models=4)
 
     # Plot data
     # plt.figure()

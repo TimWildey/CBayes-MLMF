@@ -24,6 +24,9 @@ from CBayes import CBayesPosterior
 
 # ------------------------------------------------- Config - General -------- #
 
+# Random seed
+
+np.random.seed(42)
 
 # Number of lowest-fidelity samples (1e4 should be fine for 1 QoI)
 
@@ -80,6 +83,7 @@ regression_type = 'decoupled_gaussian_processes'
 # todo: (!) implement transformations of random variables to operate in unconstrained probability space only
 
 # Regression
+# todo: (!!) check out ARD kernels for multi-QoIs
 # todo: (!!) Do a covariance / correlation check before choosing shared or separate kernels for the GPs
 # todo: (!) better regression for multiple QoIs (multi-output GPs would be an option)
 # todo: (!) GPs with non-Gaussian noise for asymmetric correlations
@@ -247,7 +251,7 @@ def get_prior_prior_pf_samples(n_samples):
             obs_scale = [0.01, 0.01, 0.01]
 
         h = 160 / 2 ** len(n_evals)
-        prior_pf_samples = elliptic_pde_ml.load_ml_data(h=h, n_models=len(n_evals) + 1)
+        prior_pf_samples = elliptic_pde_ml.load_data(h=h, n_models=len(n_evals) + 1)
         prior_samples = np.reshape(range(n_samples), (n_samples, 1))  # we only need some id here
 
         if pf_method == 'mc':
@@ -673,7 +677,12 @@ if __name__ == '__main__':
             cbayes_post_lf = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_lf)
             cbayes_post_lf.setup_posterior_and_pf()
             cbayes_post_lf.print_stats()
-            cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Low-fidelity %d / %d' % (i+1, len(n_evals)))
+            if i == 0:
+                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Low-fidelity')
+            elif i == 1:
+                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Mid-fidelity')
+            else:
+                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Mid-%d-fidelity' % i + 1)
             kls[i] = cbayes_post_lf.get_prior_post_kl()
             if i == 0:
                 cbayes_post_lf.plot_results(model_tag='lf')
