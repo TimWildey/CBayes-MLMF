@@ -2,6 +2,7 @@ import numpy as np
 import utils
 import warnings
 from scipy.stats import gaussian_kde as gkde
+import scipy.stats as stats
 
 
 class Distribution:
@@ -51,6 +52,16 @@ class Distribution:
     # Estimate the distribution sample standard deviation
     def std(self):
         return np.std(self.samples, 0)
+
+    # Estimate the distribution sample skewness
+    # https://en.wikipedia.org/wiki/Skewness
+    def skew(self):
+        return stats.skew(self.samples, 0)
+
+    # Estimate the distribution sample kurtosis
+    # https://en.wikipedia.org/wiki/Kurtosis
+    def kurt(self):
+        return stats.kurtosis(self.samples, 0)
 
     # Create a kernel density from the distribution samples
     def create_kernel_density(self):
