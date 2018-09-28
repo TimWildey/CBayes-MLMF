@@ -83,10 +83,8 @@ regression_type = 'decoupled_gaussian_processes'
 # todo: (!) implement transformations of random variables to operate in unconstrained probability space only
 
 # Regression
-# todo: (!!) check out ARD kernels for multi-QoIs
-# todo: (!!) Do a covariance / correlation check before choosing shared or separate kernels for the GPs
 # todo: (!) better regression for multiple QoIs (multi-output GPs would be an option)
-# todo: (!) GPs with non-Gaussian noise for asymmetric correlations
+# todo: (!) GPs with non-Gaussian noise?
 # todo: (!) PyMC: https://docs.pymc.io/notebooks/GP-MeansAndCovs.html
 # todo: (!) GPy: http://nbviewer.jupyter.org/github/SheffieldML/notebook/blob/master/GPy/index.ipynb
 # Check: Kernels for Vector-Valued Functions: a Review
@@ -620,13 +618,6 @@ if __name__ == '__main__':
     # Timing
     start = time.time()
 
-    # Clean pngout folder
-    if os.path.isdir('pngout'):
-        os.system('rm -rf pngout/')
-        os.mkdir('pngout')
-    else:
-        os.mkdir('pngout')
-
     # Get samples from the prior, its push-forward and the observed density
     print('')
     print('Calculating the Prior push-forward ...')
@@ -716,6 +707,22 @@ if __name__ == '__main__':
         plt.ylabel('KL')
         plt.title('Prior-Posterior KLs')
         plt.gcf().savefig('pngout/cbayes_prior_post_kls.png', dpi=300)
+
+    # Output directory name
+    outdirname = model + '_' + training_set_strategy + '_' + regression_type + '_' + str(n_samples)
+    for i in range(len(n_evals)):
+        outdirname += '_' + str(n_evals[i])
+
+    # Clean output folder
+    if os.path.isdir('pngout/' + outdirname):
+        os.system('rm -rf pngout/' + outdirname)
+        os.mkdir('pngout/' + outdirname)
+    else:
+        os.mkdir('pngout/' + outdirname)
+
+    # Move pngs into output folder
+    os.system('mv pngout/*.png pngout/' + outdirname + '/')
+    os.system('mv pngout/output.txt pngout/' + outdirname + '/')
 
     end = time.time()
     print('(Total elapsed time: %fs)' % (end - start))
