@@ -37,10 +37,9 @@ class Regression:
         if self.regression_type == 'gaussian_process':
 
             # Fit a GP regression model to approximate p(q_l|q_l-1)
-            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(np.ones(self.y_train.shape[1]),
-                                                             (1e-2, 1e2)) + WhiteKernel() + ConstantKernel()
-            # kernel = Matern() + WhiteKernel()
-            self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
+            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(np.ones(self.y_train.shape[1]), (1e-2, 1e2)) \
+                     + WhiteKernel(1.0, (1e-10, 1e3)) + ConstantKernel(1.0, (1e-10, 1e3))
+            self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6)
             self.regression_model.fit(self.x_train, self.y_train)
 
             # Predict q_l|q_l-1 at all low-fidelity samples
@@ -55,8 +54,8 @@ class Regression:
         elif self.regression_type == 'decoupled_gaussian_processes':
 
             # Fit a GP regression model to approximate p(q_l|q_l-1)
-            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(1.0, (1e-2, 1e2)) + WhiteKernel() + ConstantKernel(1.0,
-                                                                                                           (1e-10, 1e3))
+            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(1.0, (1e-2, 1e2)) + WhiteKernel() \
+                     + ConstantKernel(1.0, (1e-10, 1e3))
 
             hf_model_evals_pred = np.zeros((self.x_pred.shape[0], self.x_pred.shape[1]))
             self.regression_model = []
@@ -64,7 +63,7 @@ class Regression:
             self.sigma = np.zeros(self.x_pred.shape)
             for k in range(self.x_train.shape[1]):
 
-                self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10))
+                self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6))
                 self.regression_model[k].fit(np.expand_dims(self.x_train[:, k], axis=1), self.y_train[:, k])
 
                 # Predict q_l|q_l-1 at all low-fidelity samples
@@ -81,10 +80,10 @@ class Regression:
             # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
             # See here for more info: https://github.com/jmetzen/gp_extras/
             prototypes = KMeans(n_clusters=10).fit(self.x_train).cluster_centers_
-            kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(np.ones(self.y_train.shape[1]),
-                                                              (0.01, 100.0)) + HeteroscedasticKernel.construct(
+            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(np.ones(self.y_train.shape[1]),
+                                                             (1e-2, 1e2)) + HeteroscedasticKernel.construct(
                 prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed") + ConstantKernel(1.0, (1e-10, 1e3))
-            self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
+            self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6)
             self.regression_model.fit(self.x_train, self.y_train)
 
             # Predict q_l|q_l-1 at all low-fidelity samples
@@ -106,11 +105,11 @@ class Regression:
             self.sigma = np.zeros(self.x_pred.shape)
             for k in range(self.x_train.shape[1]):
                 prototypes = KMeans(n_clusters=5).fit(np.expand_dims(self.x_pred[:, k], axis=1)).cluster_centers_
-                kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1.0, (0.01, 100.0)) + HeteroscedasticKernel.construct(
-                    prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed") + ConstantKernel(1.0,
-                                                                                                       (1e-10, 1e3))
+                kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(1.0, (1e-2, 1e2)) + HeteroscedasticKernel.construct(
+                    prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed") \
+                    + ConstantKernel(1.0, (1e-10, 1e3))
 
-                self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10))
+                self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6))
                 self.regression_model[k].fit(np.expand_dims(self.x_train[:, k], axis=1), self.y_train[:, k])
 
                 # Predict q_l|q_l-1 at all low-fidelity samples
