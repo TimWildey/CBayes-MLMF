@@ -22,8 +22,10 @@ class Model:
     def __init__(self, eval_fun, n_evals, n_qoi, rv_samples=None, rv_samples_pred=None, label='', rv_name=''):
 
         self.rv_samples = None
+        self.rv_samples_pred = None
         self.n_random = None
         self.n_samples = None
+
         if rv_samples is not None:
             self.set_rv_samples(rv_samples)
 
@@ -72,13 +74,14 @@ class Model:
 
             self.n_samples = np.shape(self.rv_samples)[0]
 
-    # Set the model evaluation points for prediction (those will be the same of any fidelity model)
+    # Set the model evaluation points for prediction (those will be the same for any fidelity model)
     def set_rv_samples_pred(self, rv_samples_pred):
 
         self.rv_samples_pred = rv_samples_pred
 
     # Set the model evaluations at the specified model_evals
     def set_model_evals(self, model_evals):
+
         self.model_evals = model_evals
 
     # Set the model predictions at the specified model_evals_pred

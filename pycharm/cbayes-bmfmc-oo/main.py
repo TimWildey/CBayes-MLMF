@@ -67,12 +67,15 @@ n_mc_ref = int(1e4)
 training_set_strategy = 'sampling'
 
 # Regression model types
-#   - gaussian_process / decoupled_gaussian_process / shared_gaussian_process
-#   - heteroscedastic_gaussian_process / decoupled_heteroscedastic_gaussian_process /
-#     shared_heteroscedastic_gaussian_process
+#   - gaussian_process
+#   - decoupled_gaussian_process
+#   - shared_gaussian_process
+#   - heteroscedastic_gaussian_process
+#   - decoupled_heteroscedastic_gaussian_process
+#   - shared_heteroscedastic_gaussian_process
 #   - EXPERIMENTAL: pymc_gp
 
-regression_type = 'gaussian_process'
+regression_type = 'heteroscedastic_gaussian_process'
 
 
 # ---------------------------------------------------------- Todos ---------- #

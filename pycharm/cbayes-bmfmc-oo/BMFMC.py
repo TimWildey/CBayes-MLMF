@@ -436,17 +436,25 @@ class BMFMC:
                                np.max(self.models[0].model_evals_pred[:, k])])
 
                 for i in range(self.n_models):
+                    if i is 0:
+                        label = 'Low-Fidelity'
+                    elif i is self.n_models - 1:
+                        label = 'High-Fidelity'
+                    elif i is 1 and self.n_models is 3:
+                        label = 'Mid-Fidelity'
+                    else:
+                        label = 'Mid-%d-Fidelity' % (i + 1)
                     # Plot
                     color = 'C' + str(i)
                     samples = self.models[i].distribution.samples[:, k]
                     samples = np.expand_dims(samples, axis=1)
-                    marginal = Distribution(samples)
+                    marginal = Distribution(samples, label=label, rv_name='$Q$')
                     marginal.plot_kde(fignum=1, color=color, xmin=xmin, xmax=xmax)
 
                 if mc and self.mc_model is not None:
                     samples = self.mc_model.distribution.samples[:, k]
                     samples = np.expand_dims(samples, axis=1)
-                    marginal = Distribution(samples)
+                    marginal = Distribution(samples, label='Monte Carlo reference', rv_name='$Q$')
                     marginal.plot_kde(fignum=1, color='k', linestyle='--', xmin=xmin, xmax=xmax)
 
                 elif mc and self.mc_model is None:
@@ -554,6 +562,7 @@ class BMFMC:
                     plt.gcf().savefig('pngout/bmfmc_regression_model_' + str(i + 1) + '_q' + str(k + 1) + '.png',
                                       dpi=300)
                     plt.clf()
+                    return
 
             elif self.regression_type in ['shared_gaussian_process', 'shared_heteroscedastic_gaussian_process']:
 
@@ -590,6 +599,9 @@ class BMFMC:
                 plt.xlabel('$Q_1$')
                 plt.ylabel('$Q_2$')
                 plt.title('BMFMC - regression model')
+
+            else:
+                return
 
             plt.grid(b=True)
             if self.n_models > 2:
