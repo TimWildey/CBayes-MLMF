@@ -7,6 +7,7 @@ import warnings
 import utils
 from Model import Model
 from Regression import Regression
+from Distribution import Distribution
 
 
 class BMFMC:
@@ -168,6 +169,8 @@ class BMFMC:
                                   n_qoi=self.models[-1].n_qoi, rv_samples=self.models[0].rv_samples,
                                   rv_samples_pred=self.models[0].rv_samples, label='MC reference',
                                   rv_name=self.models[-1].rv_name)
+
+        if self.mc_model.model_evals is None:
             self.mc_model.evaluate()
 
         self.mc_model.set_model_evals_pred(self.mc_model.model_evals)
@@ -402,6 +405,7 @@ class BMFMC:
     def plot_results(self, mc=False):
 
         if self.models[0].n_qoi == 1:
+
             # Determine bounds
             xmin = np.min([np.min(self.models[-1].model_evals_pred), np.min(self.models[0].model_evals_pred)])
             xmax = np.max([np.max(self.models[-1].model_evals_pred), np.max(self.models[0].model_evals_pred)])
@@ -422,7 +426,38 @@ class BMFMC:
             plt.grid(b=True)
             plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
 
-        elif self.models[0].n_qoi == 2:
+        else:
+            # Plot marginals
+            for k in range(self.models[-1].n_qoi):
+                # Determine bounds
+                xmin = np.min([np.min(self.models[-1].model_evals_pred[:, k]),
+                               np.min(self.models[0].model_evals_pred[:, k])])
+                xmax = np.max([np.max(self.models[-1].model_evals_pred[:, k]),
+                               np.max(self.models[0].model_evals_pred[:, k])])
+
+                for i in range(self.n_models):
+                    # Plot
+                    color = 'C' + str(i)
+                    samples = self.models[i].distribution.samples[:, k]
+                    samples = np.expand_dims(samples, axis=1)
+                    marginal = Distribution(samples)
+                    marginal.plot_kde(fignum=1, color=color, xmin=xmin, xmax=xmax)
+
+                if mc and self.mc_model is not None:
+                    samples = self.mc_model.distribution.samples[:, k]
+                    samples = np.expand_dims(samples, axis=1)
+                    marginal = Distribution(samples)
+                    marginal.plot_kde(fignum=1, color='k', linestyle='--', xmin=xmin, xmax=xmax)
+
+                elif mc and self.mc_model is None:
+                    print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
+                    exit()
+
+                plt.grid(b=True)
+                plt.gcf().savefig('pngout/bmfmc_dists_q%d.png' % (k + 1), dpi=300)
+                plt.clf()
+
+        if self.models[0].n_qoi == 2:
 
             sns.kdeplot(self.models[0].distribution.samples[:, 0], self.models[0].distribution.samples[:, 1],
                         shade=True, shade_lowest=False, cmap='Blues', label='Low-fidelity', color='C0')
@@ -466,10 +501,6 @@ class BMFMC:
                 print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
                 exit()
 
-        else:
-            print('BMFMC plotting only available for 1 and 2 QoIs.')
-            exit()
-
         plt.clf()
 
     # Plot the regression models
@@ -481,25 +512,57 @@ class BMFMC:
 
             regression_model = self.regression_models[i]
 
-            # This hack is necessary if using the decoupled GPs
-            if isinstance(regression_model, list):
-                x_train = np.zeros((np.shape(regression_model[0].x_train)[0], hf_model.n_qoi))
-                y_train = np.zeros((np.shape(regression_model[0].x_train)[0], hf_model.n_qoi))
-                for k in range(len(regression_model)):
-                    x_train[:, k] = np.squeeze(regression_model[k].x_train)
-                    y_train[:, k] = regression_model[k].y_train
-                if hf_model.n_qoi == 1:
-                    regression_model = regression_model[0]
-
-            else:
-                x_train = regression_model.x_train
-                y_train = regression_model.y_train
+            x_train = regression_model.x_train
+            y_train = regression_model.y_train
 
             if hf_model.n_qoi == 1:
 
                 x_pred = regression_model.x_pred
                 mu = regression_model.mu
                 sigma = regression_model.sigma
+
+                # Sort to be able to use the plt.fill
+                sort_indices = np.argsort(x_pred, axis=0)
+                x_pred = np.squeeze(x_pred[sort_indices])
+                y_pred = np.squeeze(mu[sort_indices])
+                sigma = np.squeeze(sigma[sort_indices])
+
+                utils.plot_1d_conf(x_pred, y_pred, sigma)
+                utils.plot_1d_data(x_train, y_train, marker='*', linestyle='', markersize=5, color='k',
+                                   label='Training', title='BMFMC - regression model', xlabel=lf_model.rv_name,
+                                   ylabel=hf_model.rv_name)
+
+            elif self.regression_type in ['decoupled_gaussian_process', 'decoupled_heteroscedastic_gaussian_process']:
+
+                for k in range(hf_model.n_qoi):
+                    x_pred = regression_model.x_pred[:, k]
+                    mu = regression_model.mu[:, k]
+                    sigma = regression_model.sigma[:, k]
+
+                    # Sort to be able to use the plt.fill
+                    sort_indices = np.argsort(x_pred, axis=0)
+                    x_pred = np.squeeze(x_pred[sort_indices])
+                    y_pred = np.squeeze(mu[sort_indices])
+                    sigma = np.squeeze(sigma[sort_indices])
+
+                    plt.grid(b=True)
+                    utils.plot_1d_conf(x_pred, y_pred, sigma)
+                    utils.plot_1d_data(x_train[:, k], y_train[:, k], marker='*', linestyle='', markersize=5, color='k',
+                                       label='Training', title='BMFMC - regression model', xlabel=lf_model.rv_name,
+                                       ylabel=hf_model.rv_name)
+
+                    plt.gcf().savefig('pngout/bmfmc_regression_model_' + str(i + 1) + '_q' + str(k + 1) + '.png',
+                                      dpi=300)
+                    plt.clf()
+
+            elif self.regression_type in ['shared_gaussian_process', 'shared_heteroscedastic_gaussian_process']:
+
+                x_pred = regression_model.x_pred
+                x_pred = x_pred.reshape(x_pred.size)
+                mu = regression_model.mu
+                mu = mu.reshape(mu.size)
+                sigma = regression_model.sigma
+                sigma = sigma.reshape(sigma.size)
 
                 # Sort to be able to use the plt.fill
                 sort_indices = np.argsort(x_pred, axis=0)
