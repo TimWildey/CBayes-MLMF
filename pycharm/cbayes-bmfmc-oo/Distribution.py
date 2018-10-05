@@ -19,7 +19,7 @@ class Distribution:
     #   this will be a positivity transform such as x = exp(x))
 
     # Constructor
-    def __init__(self, samples, rv_name='$x$', label='Distribution over x', rv_transform=lambda x: x, kde=True):
+    def __init__(self, samples, rv_name='$x$', label='p(x)', rv_transform=lambda x: x, kde=True):
         self.rv_name = rv_name
         self.label = label
         self.samples = samples

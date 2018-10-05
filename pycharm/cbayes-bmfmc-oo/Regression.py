@@ -1,8 +1,9 @@
 import numpy as np
 from sklearn import gaussian_process
-from sklearn.gaussian_process.kernels import WhiteKernel, RBF, ConstantKernel
+from sklearn.gaussian_process.kernels import WhiteKernel, RBF, ConstantKernel, DotProduct
 from sklearn.cluster import KMeans
 from gp_extras.kernels import HeteroscedasticKernel
+import pymc3 as pm
 
 
 class Regression:
@@ -36,91 +37,179 @@ class Regression:
 
         if self.regression_type == 'gaussian_process':
 
-            # Fit a GP regression model to approximate p(q_l|q_l-1)
-            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(np.ones(self.y_train.shape[1]),
-                                                             (1e-2, 1e2)) + WhiteKernel() + ConstantKernel()
-            # kernel = Matern() + WhiteKernel()
-            self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
-            self.regression_model.fit(self.x_train, self.y_train)
+            self.regression_model = []
+            n_qoi = self.x_train.shape[1]
+            self.mu = np.zeros(self.x_pred.shape)
+            self.sigma = np.zeros(self.x_pred.shape)
+            hf_model_evals_pred = np.zeros(self.x_pred.shape)
 
-            # Predict q_l|q_l-1 at all low-fidelity samples
-            self.mu, self.sigma = self.regression_model.predict(self.x_pred, return_std=True)
-            self.sigma = np.reshape(self.sigma, (self.mu.shape[0], 1))
+            for i in range(n_qoi):
 
-            # Generate high-fidelity samples from the predictions
-            hf_model_evals_pred = np.zeros((self.mu.shape[0], self.mu.shape[1]))
-            for i in range(self.mu.shape[0]):
-                hf_model_evals_pred[i, :] = self.mu[i, :] + self.sigma[i] * np.random.randn(1, self.mu.shape[1])
+                # Fit a GP regression model to approximate p(q_l|q_l-1)
+                kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF(np.ones(n_qoi)) \
+                    + WhiteKernel()
+                self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6,
+                                                                                       n_restarts_optimizer=0))
+                self.regression_model[i].fit(self.x_train, self.y_train[:, i])
 
-        elif self.regression_type == 'decoupled_gaussian_processes':
+                # Predict q_l|q_l-1 at all low-fidelity samples
+                self.mu[:, i], self.sigma[:, i] = self.regression_model[i].predict(self.x_pred, return_std=True)
 
-            # Fit a GP regression model to approximate p(q_l|q_l-1)
-            kernel = ConstantKernel(1.0, (1e-10, 1e3)) * RBF(1.0, (1e-2, 1e2)) + WhiteKernel() + ConstantKernel(1.0,
-                                                                                                           (1e-10, 1e3))
+                # Generate high-fidelity samples from the predictions
+                for j in range(self.mu.shape[0]):
+                    hf_model_evals_pred[j, i] = self.mu[j, i] + self.sigma[j, i] * np.random.randn()
 
-            hf_model_evals_pred = np.zeros((self.x_pred.shape[0], self.x_pred.shape[1]))
+        elif self.regression_type == 'decoupled_gaussian_process':
+
             self.regression_model = []
             self.mu = np.zeros(self.x_pred.shape)
             self.sigma = np.zeros(self.x_pred.shape)
-            for k in range(self.x_train.shape[1]):
+            hf_model_evals_pred = np.zeros(self.x_pred.shape)
 
-                self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10))
-                self.regression_model[k].fit(np.expand_dims(self.x_train[:, k], axis=1), self.y_train[:, k])
+            for i in range(self.x_train.shape[1]):
+
+                # Fit a GP regression model to approximate p(q_l|q_l-1)
+                kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF() + WhiteKernel()
+                self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6))
+                self.regression_model[i].fit(np.expand_dims(self.x_train[:, i], axis=1), self.y_train[:, i])
 
                 # Predict q_l|q_l-1 at all low-fidelity samples
-                self.mu[:, k], self.sigma[:, k] = self.regression_model[k].predict(
-                    np.expand_dims(self.x_pred[:, k], axis=1),
-                    return_std=True)
+                self.mu[:, i], self.sigma[:, i] = self.regression_model[i].predict(
+                    np.expand_dims(self.x_pred[:, i], axis=1), return_std=True)
 
                 # Generate high-fidelity samples from the predictions
-                for i in range(self.mu.shape[0]):
-                    hf_model_evals_pred[i, k] = self.mu[i, k] + self.sigma[i, k] * np.random.randn()
+                for j in range(self.mu.shape[0]):
+                    hf_model_evals_pred[j, i] = self.mu[j, i] + self.sigma[j, i] * np.random.randn()
+
+        elif self.regression_type == 'shared_gaussian_process':
+
+            self.mu = np.zeros(self.x_pred.shape)
+            self.sigma = np.zeros(self.x_pred.shape)
+            hf_model_evals_pred = np.zeros(self.x_pred.shape)
+
+            # Fit a GP regression model to approximate p(q_l|q_l-1)
+            x_train = self.x_train.reshape((self.x_train.size, 1))
+            y_train = self.y_train.reshape(self.y_train.size)
+            x_pred = self.x_pred.reshape((self.x_pred.size, 1))
+            kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF() + WhiteKernel()
+            self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6)
+            self.regression_model.fit(x_train, y_train)
+            mu, sigma = self.regression_model.predict(x_pred, return_std=True)
+            self.mu = mu.reshape(self.x_pred.shape)
+            self.sigma = sigma.reshape(self.x_pred.shape)
+
+            # Generate high-fidelity samples from the predictions
+            for i in range(self.mu.shape[1]):
+                for j in range(self.mu.shape[0]):
+                    hf_model_evals_pred[j, i] = self.mu[j, i] + self.sigma[j, i] * np.random.randn()
 
         elif self.regression_type == 'heteroscedastic_gaussian_process':
 
-            # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
-            # See here for more info: https://github.com/jmetzen/gp_extras/
-            prototypes = KMeans(n_clusters=10).fit(self.x_train).cluster_centers_
-            kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(np.ones(self.y_train.shape[1]),
-                                                              (0.01, 100.0)) + HeteroscedasticKernel.construct(
-                prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed") + ConstantKernel(1.0, (1e-10, 1e3))
-            self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10)
-            self.regression_model.fit(self.x_train, self.y_train)
+            self.regression_model = []
+            n_qoi = self.x_train.shape[1]
+            self.mu = np.zeros(self.x_pred.shape)
+            self.sigma = np.zeros(self.x_pred.shape)
+            hf_model_evals_pred = np.zeros(self.x_pred.shape)
 
-            # Predict q_l|q_l-1 at all low-fidelity samples
-            self.mu, self.sigma = self.regression_model.predict(self.x_pred, return_std=True)
-            self.sigma = np.reshape(self.sigma, (self.mu.shape[0], 1))
+            for i in range(n_qoi):
 
-            # Generate high-fidelity samples from the predictions
-            hf_model_evals_pred = np.zeros((self.mu.shape[0], self.mu.shape[1]))
-            for i in range(self.mu.shape[0]):
-                hf_model_evals_pred[i, :] = self.mu[i, :] + self.sigma[i] * np.random.randn(1, self.mu.shape[1])
+                # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
+                # See here for more info: https://github.com/jmetzen/gp_extras/
+                prototypes = KMeans(n_clusters=5).fit(self.x_train).cluster_centers_
+                kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF(np.ones(self.y_train.shape[1])) \
+                    + HeteroscedasticKernel.construct(prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
+                self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6))
+                self.regression_model[i].fit(self.x_train, self.y_train[:, i])
+
+                # Predict q_l|q_l-1 at all low-fidelity samples
+                self.mu[:, i], self.sigma[:, i] = self.regression_model[i].predict(self.x_pred, return_std=True)
+
+                # Generate high-fidelity samples from the predictions
+                for j in range(self.mu.shape[0]):
+                    hf_model_evals_pred[j, i] = self.mu[j, i] + self.sigma[j, i] * np.random.randn()
 
         elif self.regression_type == 'decoupled_heteroscedastic_gaussian_process':
 
-            # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
-            # See here for more info: https://github.com/jmetzen/gp_extras/
-            hf_model_evals_pred = np.zeros((self.x_pred.shape[0], self.x_pred.shape[1]))
             self.regression_model = []
             self.mu = np.zeros(self.x_pred.shape)
             self.sigma = np.zeros(self.x_pred.shape)
-            for k in range(self.x_train.shape[1]):
-                prototypes = KMeans(n_clusters=5).fit(np.expand_dims(self.x_pred[:, k], axis=1)).cluster_centers_
-                kernel = ConstantKernel(1.0, (1e-10, 1000)) * RBF(1.0, (0.01, 100.0)) + HeteroscedasticKernel.construct(
-                    prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed") + ConstantKernel(1.0,
-                                                                                                       (1e-10, 1e3))
+            hf_model_evals_pred = np.zeros(self.x_pred.shape)
 
-                self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-10))
-                self.regression_model[k].fit(np.expand_dims(self.x_train[:, k], axis=1), self.y_train[:, k])
+            for i in range(self.x_train.shape[1]):
+
+                # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
+                # See here for more info: https://github.com/jmetzen/gp_extras/
+                prototypes = KMeans(n_clusters=5).fit(np.expand_dims(self.x_pred[:, i], axis=1)).cluster_centers_
+                kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF() \
+                    + HeteroscedasticKernel.construct(prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
+                self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6))
+                self.regression_model[i].fit(np.expand_dims(self.x_train[:, i], axis=1), self.y_train[:, i])
 
                 # Predict q_l|q_l-1 at all low-fidelity samples
-                self.mu[:, k], self.sigma[:, k] = self.regression_model[k].predict(
-                    np.expand_dims(self.x_pred[:, k], axis=1),
-                    return_std=True)
+                self.mu[:, i], self.sigma[:, i] = self.regression_model[i].predict(
+                    np.expand_dims(self.x_pred[:, i], axis=1), return_std=True)
 
                 # Generate high-fidelity samples from the predictions
-                for i in range(self.mu.shape[0]):
-                    hf_model_evals_pred[i, k] = self.mu[i, k] + self.sigma[i, k] * np.random.randn()
+                for j in range(self.mu.shape[0]):
+                    hf_model_evals_pred[j, i] = self.mu[j, i] + self.sigma[j, i] * np.random.randn()
+
+        elif self.regression_type == 'shared_heteroscedastic_gaussian_process':
+
+            self.mu = np.zeros(self.x_pred.shape)
+            self.sigma = np.zeros(self.x_pred.shape)
+            hf_model_evals_pred = np.zeros(self.x_pred.shape)
+
+            # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
+            # See here for more info: https://github.com/jmetzen/gp_extras/
+            x_train = self.x_train.reshape((self.x_train.size, 1))
+            y_train = self.y_train.reshape(self.y_train.size)
+            x_pred = self.x_pred.reshape((self.x_pred.size, 1))
+            prototypes = KMeans(n_clusters=5*self.x_pred.shape[1]).fit(x_pred).cluster_centers_
+            kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF() \
+                + HeteroscedasticKernel.construct(prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
+            self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6)
+            self.regression_model.fit(x_train, y_train)
+            mu, sigma = self.regression_model.predict(x_pred, return_std=True)
+            self.mu = mu.reshape(self.x_pred.shape)
+            self.sigma = sigma.reshape(self.x_pred.shape)
+
+            # Generate high-fidelity samples from the predictions
+            for i in range(self.mu.shape[1]):
+                for j in range(self.mu.shape[0]):
+                    hf_model_evals_pred[j, i] = self.mu[j, i] + self.sigma[j, i] * np.random.randn()
+
+        elif self.regression_type == 'pymc_gp':
+
+            with pm.Model() as model:
+
+                beta = np.random.randn(self.y_train.shape[1])
+                b = np.zeros(self.y_train.shape[1])
+
+                lin_func = pm.gp.mean.Linear(coeffs=beta, intercept=b)
+                lin_func = pm.gp.mean.Zero()
+
+                ell = pm.Gamma('l', alpha=2, beta=1)
+                eta = pm.HalfCauchy('eta', beta=5)
+
+                cov = eta ** 2 * pm.gp.cov.Matern52(1, ell)
+                # cov = eta ** 2 * pm.gp.cov.ExpQuad(1, ell)
+
+                gp = pm.gp.Marginal(cov_func=cov, mean_func=lin_func)
+
+                sigma = pm.HalfCauchy('sigma', beta=5)
+                gp.marginal_likelihood('y', X=self.x_train, y=self.y_train.squeeze(), noise=sigma)
+
+                mp = pm.find_MAP()
+
+                self.mu, var = gp.predict(self.x_pred, point=mp, diag=True)
+                self.sigma = np.sqrt(var)
+                self.mu = np.reshape(self.mu, (self.mu.shape[0], self.y_train.shape[1]))
+                self.sigma = np.reshape(self.sigma, (self.mu.shape[0], 1))
+
+            # Generate high-fidelity samples from the predictions
+            hf_model_evals_pred = np.zeros((self.mu.shape[0], self.y_train.shape[1]))
+            for i in range(self.mu.shape[0]):
+                hf_model_evals_pred[i] = self.mu[i] + self.sigma[i] * np.random.randn(1, self.y_train.shape[1])
 
         else:
             print('Unknown regression model %s.' % self.regression_type)
@@ -146,23 +235,24 @@ class Regression:
 
         elif self.training_set_strategy in ['support_covering', 'support_covering_adaptive']:
 
+            x_train_linspace = None
+
             if len(regression_models) == id:
                 # Create a uniform grid across the support of p(q)
-
                 if hf_model.n_qoi is 1:
-                    sup_min = np.percentile(lf_model.model_evals_pred[:, 0], 1)
-                    sup_max = np.percentile(lf_model.model_evals_pred[:, 0], 99)
+                    sup_min = np.min(lf_model.model_evals_pred[:, 0])
+                    sup_max = np.max(lf_model.model_evals_pred[:, 0])
                     x_train_linspace = np.linspace(sup_min, sup_max, num=hf_model.n_evals)
                     x_train_linspace = np.reshape(x_train_linspace, (hf_model.n_evals, hf_model.n_qoi))
 
                 elif hf_model.n_qoi is 2:
                     ab_num = int(np.sqrt(hf_model.n_evals))
                     hf_model.n_evals = ab_num ** 2
-                    sup_min = np.percentile(lf_model.model_evals_pred[:, 0], 1)
-                    sup_max = np.percentile(lf_model.model_evals_pred[:, 0], 99)
+                    sup_min = np.min(lf_model.model_evals_pred[:, 0])
+                    sup_max = np.max(lf_model.model_evals_pred[:, 0])
                     a = np.linspace(sup_min, sup_max, num=ab_num)
-                    sup_min = np.percentile(lf_model.model_evals_pred[:, 1], 1)
-                    sup_max = np.percentile(lf_model.model_evals_pred[:, 1], 99)
+                    sup_min = np.min(lf_model.model_evals_pred[:, 1])
+                    sup_max = np.max(lf_model.model_evals_pred[:, 1])
                     b = np.linspace(sup_min, sup_max, num=ab_num)
                     aa, bb = np.meshgrid(a, b)
                     x_train_linspace = np.reshape(np.vstack([aa, bb]), (2, hf_model.n_evals)).T
@@ -170,14 +260,14 @@ class Regression:
                 elif hf_model.n_qoi is 3:
                     abc_num = int(np.power(hf_model.n_evals, 1. / 3))
                     hf_model.n_evals = abc_num ** 3
-                    sup_min = np.percentile(lf_model.model_evals_pred[:, 0], 1)
-                    sup_max = np.percentile(lf_model.model_evals_pred[:, 0], 99)
+                    sup_min = np.min(lf_model.model_evals_pred[:, 0])
+                    sup_max = np.max(lf_model.model_evals_pred[:, 0])
                     a = np.linspace(sup_min, sup_max, num=abc_num)
-                    sup_min = np.percentile(lf_model.model_evals_pred[:, 1], 1)
-                    sup_max = np.percentile(lf_model.model_evals_pred[:, 1], 99)
+                    sup_min = np.min(lf_model.model_evals_pred[:, 1])
+                    sup_max = np.max(lf_model.model_evals_pred[:, 1])
                     b = np.linspace(sup_min, sup_max, num=abc_num)
-                    sup_min = np.percentile(lf_model.model_evals_pred[:, 2], 1)
-                    sup_max = np.percentile(lf_model.model_evals_pred[:, 2], 99)
+                    sup_min = np.min(lf_model.model_evals_pred[:, 2])
+                    sup_max = np.max(lf_model.model_evals_pred[:, 2])
                     c = np.linspace(sup_min, sup_max, num=abc_num)
                     aa, bb, cc = np.meshgrid(a, b, c)
                     x_train_linspace = np.reshape(np.vstack([aa, bb, cc]), (3, hf_model.n_evals)).T
@@ -203,8 +293,8 @@ class Regression:
             # Find the lower-fidelity samples closest to the grid points and get the corresponding lambdas
             x_train = np.zeros((n_train, hf_model.n_qoi))
             hf_rv_samples = np.zeros((n_train, lf_model.n_random))
-            for i in range(n_train):
 
+            for i in range(n_train):
                 # This is only exact for the lowest fidelity regression model
                 if id == 0:
                     idx = (np.linalg.norm(lf_model.model_evals_pred - x_train_linspace[i, :], axis=1, ord=1)).argmin()
@@ -214,17 +304,20 @@ class Regression:
                 # We use the mean predictions of the GP to do that.
                 else:
                     regression_model = regression_models[id - 1]
-
-                    # This hack is necessary if using the decoupled GPs
-                    if isinstance(regression_model, list):
-                        mu = np.zeros((regression_model.x_pred.shape[0], hf_model.n_qoi))
-                        for k in range(len(regression_model)):
-                            mu[:, k] = regression_model[k].mu
-                    else:
-                        mu = regression_model.mu
+                    mu = regression_model.mu
 
                     idx = (np.linalg.norm(mu - x_train_linspace[i, :], axis=1, ord=1)).argmin()
+
+                    # There are 3 ways to choose x_train (the first seems to be the most accurate one):
+
+                    # 1) Evaluating the low-fidelity
                     x_train[i, :] = lf_model.eval_fun(lf_model.rv_samples_pred[idx, :])
+
+                    # 2) Using the predicted mean
+                    # x_train[i, :] = mu[idx, :]
+
+                    # 3) Using the predicted sample
+                    # x_train[i, :] = lf_model.model_evals_pred[idx, :]
 
                 hf_rv_samples[i, :] = lf_model.rv_samples_pred[idx, :]
 
@@ -243,9 +336,22 @@ class Regression:
             # Get the corresponding lower-fidelity evaluations
             # Those are only available for the lowest-fidelity model and need to be computed for any other model
             if id > 0:
+
+                # There are 3 ways to choose x_train (the first seems to be the most accurate one):
+
+                # 1) Evaluating the low-fidelity
                 x_train = np.zeros((hf_model.n_evals, lf_model.n_qoi))
                 for i in range(hf_model.n_evals):
                     x_train[i, :] = lf_model.eval_fun(lf_model.rv_samples_pred[indices[i], :])
+
+                # 2) Using the predicted mean
+                # regression_model = regression_models[id - 1]
+                # mu = regression_model.mu
+                # x_train = mu[indices, :]
+
+                # 3) Using the predicted sample
+                # x_train = lf_model.model_evals_pred[indices]
+
             elif id == 0:
                 x_train = lf_model.model_evals_pred[indices, :]
             else:
@@ -272,59 +378,45 @@ class Regression:
             print('No regression model available. Make sure you have called build_regression_predict_and_sample().')
             exit()
 
-        hf_model_evals_pred = None
+        mu = np.zeros(x_pred.shape)
+        sigma = np.zeros(x_pred.shape)
+        hf_model_evals_pred = np.zeros(x_pred.shape)
 
-        if self.regression_type == 'gaussian_process':
+        if self.regression_type in ['gaussian_process', 'heteroscedastic_gaussian_process']:
 
-            # Predict q_l|q_l-1 at all low-fidelity samples
-            mu, sigma = self.regression_model.predict(x_pred, return_std=True)
-            sigma = np.reshape(sigma, (mu.shape[0], 1))
+            for i in range(x_pred.shape[1]):
 
-            # Generate high-fidelity samples from the predictions
-            hf_model_evals_pred = np.zeros((mu.shape[0], mu.shape[1]))
-            for i in range(mu.shape[0]):
-                hf_model_evals_pred[i, :] = mu[i, :] + sigma[i] * np.random.randn(1, mu.shape[1])
-
-        elif self.regression_type == 'decoupled_gaussian_processes':
-
-            hf_model_evals_pred = np.zeros((x_pred.shape[0], x_pred.shape[1]))
-            mu = np.zeros(x_pred.shape)
-            sigma = np.zeros(x_pred.shape)
-
-            for k in range(self.x_train.shape[1]):
                 # Predict q_l|q_l-1 at all low-fidelity samples
-                mu[:, k], sigma[:, k] = self.regression_model[k].predict(np.expand_dims(x_pred[:, k], axis=1),
+                mu[:, i], sigma[:, i] = self.regression_model[i].predict(x_pred, return_std=True)
+
+                # Generate high-fidelity samples from the predictions
+                for j in range(mu.shape[0]):
+                    hf_model_evals_pred[j, i] = mu[j, i] + sigma[j, i] * np.random.randn()
+
+        elif self.regression_type in ['decoupled_gaussian_process', 'decoupled_heteroscedastic_gaussian_process']:
+
+            for i in range(x_pred.shape[1]):
+
+                # Predict q_l|q_l-1 at all low-fidelity samples
+                mu[:, i], sigma[:, i] = self.regression_model[i].predict(np.expand_dims(x_pred[:, i], axis=1),
                                                                          return_std=True)
 
                 # Generate high-fidelity samples from the predictions
-                for i in range(mu.shape[0]):
-                    hf_model_evals_pred[i, k] = mu[i, k] + sigma[i, k] * np.random.randn()
+                for j in range(mu.shape[0]):
+                    hf_model_evals_pred[j, i] = mu[j, i] + sigma[j, i] * np.random.randn()
 
-        elif self.regression_type == 'heteroscedastic_gaussian_process':
+        elif self.regression_type in ['shared_gaussian_process', 'shared_heteroscedastic_gaussian_process']:
 
-            # Predict q_l|q_l-1 at all low-fidelity samples
-            mu, sigma = self.regression_model.predict(x_pred, return_std=True)
-            sigma = np.reshape(sigma, (mu.shape[0], 1))
+            # Fit a GP regression model to approximate p(q_l|q_l-1)
+            x_pred_tmp = x_pred.reshape((x_pred.size, 1))
+            mu, sigma = self.regression_model.predict(x_pred_tmp, return_std=True)
+            mu = mu.reshape(x_pred.shape)
+            sigma = sigma.reshape(x_pred.shape)
 
             # Generate high-fidelity samples from the predictions
-            hf_model_evals_pred = np.zeros((mu.shape[0], mu.shape[1]))
-            for i in range(mu.shape[0]):
-                hf_model_evals_pred[i, :] = mu[i, :] + sigma[i] * np.random.randn(1, mu.shape[1])
-
-        elif self.regression_type == 'decoupled_heteroscedastic_gaussian_process':
-
-            hf_model_evals_pred = np.zeros((x_pred.shape[0], x_pred.shape[1]))
-            mu = np.zeros(x_pred.shape)
-            sigma = np.zeros(x_pred.shape)
-
-            for k in range(self.x_train.shape[1]):
-                # Predict q_l|q_l-1 at all low-fidelity samples
-                mu[:, k], sigma[:, k] = self.regression_model[k].predict(np.expand_dims(x_pred[:, k], axis=1),
-                                                                         return_std=True)
-
-                # Generate high-fidelity samples from the predictions
-                for i in range(mu.shape[0]):
-                    hf_model_evals_pred[i, k] = mu[i, k] + sigma[i, k] * np.random.randn()
+            for i in range(mu.shape[1]):
+                for j in range(mu.shape[0]):
+                    hf_model_evals_pred[j, i] = mu[j, i] + sigma[j, i] * np.random.randn()
 
         else:
             print('Unknown regression model %s.' % self.regression_type)

@@ -22,8 +22,8 @@ def plot_1d_data(x, y, marker='None', markersize=5, linestyle='-', linewidth=3, 
              color=color, label=label)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.xlim(xlim)
-    plt.ylim(ylim)
+    # plt.xlim(xlim)
+    # plt.ylim(ylim)
     plt.grid()
     plt.legend(loc='upper left')
     plt.title(title)
@@ -38,7 +38,8 @@ def plot_1d_kde(qkde, xmin=0.0, xmax=1.0, linestyle='-', linewidth=3, color='C0'
     else:
         plt.figure(num)
 
-    qplot = np.linspace(xmin, xmax, num=200)
+    delta = xmax - xmin
+    qplot = np.linspace(xmin - 0.1*delta, xmax + 0.1*delta, num=200)
     plt.plot(qplot, qkde(qplot), linestyle=linestyle, linewidth=linewidth, color=color, label=label)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)

@@ -17,16 +17,13 @@ import scipy.io as sio
 # - Pressure values at (0.0540, 0.5487), (0.8726,0.8518) and (0.3748,0.0505)
 
 
-def load_data(h=10, n_evals=[50]):
+def load_data(h=10, n_evals=[1000, 50]):
     filepath = os.path.abspath(os.path.dirname(__file__))
     qvals = []
 
-    for i in range(len(n_evals)+1):
+    for i in range(len(n_evals)):
         data_set = sio.loadmat(filepath + '/elliptic_kde100_10K_h%d_q.mat' % h)
-        if i == 0:
-            qvals.append(data_set['qq'])
-        else:
-            qvals.append(data_set['qq'][0:n_evals[i-1], :])
+        qvals.append(data_set['qq'][0:n_evals[i], :])
         h *= 2
 
     return qvals
