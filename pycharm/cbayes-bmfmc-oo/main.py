@@ -35,7 +35,7 @@ np.random.seed(42)
 #   - elliptic_pde_ml_fixed / elliptic_pde_ml_fixed_2d / elliptic_pde_ml_fixed_3d
 #   - ode_pp /  ode_pp_2d
 
-model = 'elliptic_pde_ml_3d'
+model = 'elliptic_pde_ml_2d'
 
 # Push-forward methods (weird name...):
 #   - mc
