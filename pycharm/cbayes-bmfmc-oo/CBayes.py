@@ -127,7 +127,7 @@ class CBayesPosterior:
         if self.p_obs.n_dim == 1:
             self.p_prior_pf.plot_kde(color='C0', xmin=xmin, xmax=xmax)
             self.p_obs.plot_kde(color='C1', xmin=xmin, xmax=xmax)
-            self.p_post_pf.plot_kde(color='C2', linestyle='--', xmin=xmin, xmax=xmax, title='CBayes %s' % model_tag)
+            self.p_post_pf.plot_kde(color='C2', linestyle='--', xmin=xmin, xmax=xmax)
 
         elif self.p_obs.n_dim == 2:
             sns.kdeplot(self.p_prior_pf.samples[:, 0], self.p_prior_pf.samples[:, 1], shade=True, shade_lowest=False,
@@ -139,7 +139,6 @@ class CBayesPosterior:
             plt.legend(loc='upper right')
             plt.xlabel('$Q_1$')
             plt.ylabel('$Q_2$')
-            plt.title('CBayes %s' % model_tag)
         else:
             return
 
@@ -148,11 +147,10 @@ class CBayesPosterior:
 
         # Plot some bivariate distributions
         if self.p_obs.n_dim == 2 and model_tag == 'hf':
-            self.p_obs.plot_kde(title='Observed density')
+            self.p_obs.plot_kde()
             plt.grid(b=True)
             plt.gcf().savefig('pngout/cbayes_dists_obs.png', dpi=300)
             plt.clf()
-            self.p_post_pf.plot_kde(title='Posterior push-forward')
             plt.gcf().savefig('pngout/cbayes_dists_hf_post_pf.png', dpi=300)
 
         plt.clf()
@@ -165,8 +163,7 @@ class CBayesPosterior:
             self.p_post.create_kernel_density()
             xmin = np.min(self.p_prior.samples, axis=0)
             xmax = np.max(self.p_prior.samples, axis=0)
-            self.p_post.plot_kde(fignum=fignum, title='Posterior densities', color=color, linestyle=linestyle,
-                                 label=label, xmin=xmin, xmax=xmax)
+            self.p_post.plot_kde(fignum=fignum, color=color, linestyle=linestyle, label=label, xmin=xmin, xmax=xmax)
             if save_fig:
                 plt.grid(b=True)
                 plt.gcf().savefig('pngout/cbayes_post_densities.png', dpi=300)

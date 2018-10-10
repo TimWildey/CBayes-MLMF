@@ -31,7 +31,7 @@ def plot_1d_data(x, y, marker='None', markersize=5, linestyle='-', linewidth=3, 
 
 # Plot a 1D kernel density estimation
 def plot_1d_kde(qkde, xmin=0.0, xmax=1.0, linestyle='-', linewidth=3, color='C0', num=1,
-                xlabel='$x$', ylabel='$p(x)$', label='', title='KDE'):
+                xlabel='$x$', ylabel='$p(x)$', label='', title=''):
 
     if len(str(num)) >= 3:
         plt.subplot(num)
@@ -49,7 +49,7 @@ def plot_1d_kde(qkde, xmin=0.0, xmax=1.0, linestyle='-', linewidth=3, color='C0'
 
 
 # Plot a 2D kernel density estimation
-def plot_2d_kde(samples, xlabel='$Q_1$', ylabel='$Q_2$', num=1, cmap='Blues', title='KDE'):
+def plot_2d_kde(samples, xlabel='$Q_1$', ylabel='$Q_2$', num=1, cmap='Blues', title=''):
 
     if len(str(num)) >= 3:
         plt.subplot(num)
@@ -64,7 +64,36 @@ def plot_2d_kde(samples, xlabel='$Q_1$', ylabel='$Q_2$', num=1, cmap='Blues', ti
     g.set_axis_labels(xlabel, ylabel)
     plt.subplots_adjust(top=0.95)
     g.fig.suptitle(title)
-    plt.legend()
+    # plt.legend()
+
+
+# Plot multi-QoI push-forward densities
+def plot_multi_qoi(samples, num=1, cmap='Blues', title=''):
+
+    if len(str(num)) >= 3:
+        plt.subplot(num)
+    else:
+        plt.figure(num)
+
+    colums = []
+    for i in range(samples.shape[1]):
+        if i is 0:
+            rms = 'I'
+        elif i is 1:
+            rms = 'II'
+        elif i is 2:
+            rms = 'III'
+        else:
+            rms = ''
+
+        colums.append('$Q^{\mathrm{(%s)}}$' % rms)
+
+    df = pd.DataFrame(samples, columns=colums)
+
+    g = sns.PairGrid(df)
+    g = g.map_upper(plt.scatter, color='k', alpha=0.3, s=1, linewidth=0.0, marker='o')
+    g = g.map_lower(sns.kdeplot)
+    g = g.map_diag(sns.kdeplot, lw=3, legend=False)
 
 
 # Plot a 1D histogram given samples
@@ -92,7 +121,7 @@ def plot_1d_conf(x_pred, y_pred, sigma, num=1, title=''):
         plt.figure(num)
 
     ysd = 3.0*sigma
-    plt.plot(x_pred, y_pred, 'o', markersize=3, label=r'Prediction')
+    plt.plot(x_pred, y_pred, 'o', markersize=3, label=r'Predicted mean')
     plt.fill(np.concatenate([x_pred, x_pred[::-1]]),
              np.concatenate([(y_pred - ysd),
                              (y_pred + ysd)[::-1]]),

@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import scipy.stats as stats
-import warnings
 
 import utils
 from Model import Model
@@ -413,20 +412,25 @@ class BMFMC:
             for i in range(self.n_models):
                 # Plot
                 color = 'C' + str(i)
-                self.models[i].distribution.plot_kde(fignum=1, color=color, xmin=xmin, xmax=xmax,
-                                                     title='BMFMC - approximate distributions')
+                self.models[i].distribution.plot_kde(fignum=1, color=color, xmin=xmin, xmax=xmax)
 
             if mc and self.mc_model is not None:
                 self.mc_model.distribution.plot_kde(fignum=1, color='k', linestyle='--',
-                                                    xmin=xmin, xmax=xmax, title='BMFMC - approximate distributions')
+                                                    xmin=xmin, xmax=xmax)
             elif mc and self.mc_model is None:
                 print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
                 exit()
 
             plt.grid(b=True)
-            plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
+            plt.gcf().savefig('pngout/bmfmc_densities.png', dpi=300)
 
         else:
+            # Seaborn pairplot of the high-fidelity push-forward
+            utils.plot_multi_qoi(samples=self.models[-1].model_evals_pred)
+            plt.grid(b=True)
+            plt.gcf().savefig('pngout/bmfmc_hf_pairplot.png', dpi=300)
+            plt.clf()
+
             # Plot marginals
             for k in range(self.models[-1].n_qoi):
                 # Determine bounds
@@ -434,6 +438,17 @@ class BMFMC:
                                np.min(self.models[0].model_evals_pred[:, k])])
                 xmax = np.max([np.max(self.models[-1].model_evals_pred[:, k]),
                                np.max(self.models[0].model_evals_pred[:, k])])
+
+                if k is 0:
+                    rms = 'I'
+                elif k is 1:
+                    rms = 'II'
+                elif k is 2:
+                    rms = 'III'
+                else:
+                    rms = ''
+
+                rv_name = '$Q^{\mathrm{(%s)}}$' % rms
 
                 for i in range(self.n_models):
                     if i is 0:
@@ -448,13 +463,13 @@ class BMFMC:
                     color = 'C' + str(i)
                     samples = self.models[i].distribution.samples[:, k]
                     samples = np.expand_dims(samples, axis=1)
-                    marginal = Distribution(samples, label=label, rv_name='$Q$')
+                    marginal = Distribution(samples, label=label, rv_name=rv_name)
                     marginal.plot_kde(fignum=1, color=color, xmin=xmin, xmax=xmax)
 
                 if mc and self.mc_model is not None:
                     samples = self.mc_model.distribution.samples[:, k]
                     samples = np.expand_dims(samples, axis=1)
-                    marginal = Distribution(samples, label='Monte Carlo reference', rv_name='$Q$')
+                    marginal = Distribution(samples, label='Monte Carlo reference', rv_name=rv_name)
                     marginal.plot_kde(fignum=1, color='k', linestyle='--', xmin=xmin, xmax=xmax)
 
                 elif mc and self.mc_model is None:
@@ -462,7 +477,7 @@ class BMFMC:
                     exit()
 
                 plt.grid(b=True)
-                plt.gcf().savefig('pngout/bmfmc_dists_q%d.png' % (k + 1), dpi=300)
+                plt.gcf().savefig('pngout/bmfmc_densities_q%d.png' % (k + 1), dpi=300)
                 plt.clf()
 
         if self.models[0].n_qoi == 2:
@@ -481,7 +496,6 @@ class BMFMC:
             plt.xlabel('$Q_1$')
             plt.ylabel('$Q_2$')
             plt.legend(loc='upper right')
-            plt.title('BMFMC - approximate distributions')
             plt.grid(b=True)
 
             plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
@@ -489,19 +503,19 @@ class BMFMC:
             ymin, ymax = plt.ylim()
             plt.clf()
 
-            self.models[0].distribution.plot_kde(title='BMFMC - low fidelity')
+            self.models[0].distribution.plot_kde()
             plt.xlim([xmin, xmax])
             plt.ylim([ymin, ymax])
             plt.gcf().savefig('pngout/bmfmc_lf.png', dpi=300)
             plt.clf()
 
-            self.models[-1].distribution.plot_kde(title='BMFMC - high fidelity')
+            self.models[-1].distribution.plot_kde()
             plt.xlim([xmin, xmax])
             plt.ylim([ymin, ymax])
             plt.gcf().savefig('pngout/bmfmc_hf.png', dpi=300)
 
             if mc and self.mc_model is not None:
-                self.mc_model.distribution.plot_kde(title='Monte Carlo reference')
+                self.mc_model.distribution.plot_kde()
                 plt.xlim([xmin, xmax])
                 plt.ylim([ymin, ymax])
                 plt.gcf().savefig('pngout/bmfmc_mc.png', dpi=300)
@@ -537,8 +551,7 @@ class BMFMC:
 
                 utils.plot_1d_conf(x_pred, y_pred, sigma)
                 utils.plot_1d_data(x_train, y_train, marker='*', linestyle='', markersize=5, color='k',
-                                   label='Training', title='BMFMC - regression model', xlabel=lf_model.rv_name,
-                                   ylabel=hf_model.rv_name)
+                                   label='Training data', xlabel=lf_model.rv_name, ylabel=hf_model.rv_name)
 
             elif self.regression_type in ['decoupled_gaussian_process', 'decoupled_heteroscedastic_gaussian_process']:
 
@@ -556,13 +569,12 @@ class BMFMC:
                     plt.grid(b=True)
                     utils.plot_1d_conf(x_pred, y_pred, sigma)
                     utils.plot_1d_data(x_train[:, k], y_train[:, k], marker='*', linestyle='', markersize=5, color='k',
-                                       label='Training', title='BMFMC - regression model', xlabel=lf_model.rv_name,
-                                       ylabel=hf_model.rv_name)
+                                       label='Training data', xlabel=lf_model.rv_name, ylabel=hf_model.rv_name)
 
                     plt.gcf().savefig('pngout/bmfmc_regression_model_' + str(i + 1) + '_q' + str(k + 1) + '.png',
                                       dpi=300)
                     plt.clf()
-                    return
+                continue
 
             elif self.regression_type in ['shared_gaussian_process', 'shared_heteroscedastic_gaussian_process']:
 
@@ -581,8 +593,7 @@ class BMFMC:
 
                 utils.plot_1d_conf(x_pred, y_pred, sigma)
                 utils.plot_1d_data(x_train, y_train, marker='*', linestyle='', markersize=5, color='k',
-                                   label='Training', title='BMFMC - regression model', xlabel=lf_model.rv_name,
-                                   ylabel=hf_model.rv_name)
+                                   label='Training data', xlabel=lf_model.rv_name, ylabel=hf_model.rv_name)
 
             elif hf_model.n_qoi == 2:
 
@@ -598,7 +609,6 @@ class BMFMC:
                              linewidth=1)
                 plt.xlabel('$Q_1$')
                 plt.ylabel('$Q_2$')
-                plt.title('BMFMC - regression model')
 
             else:
                 return
@@ -614,17 +624,42 @@ class BMFMC:
     # Plot the approximate joint densities
     def plot_joint_densities(self):
 
-        for i in range(self.n_models - 1):
-            lf_model = self.models[i]
-            hf_model = self.models[i + 1]
+        if self.models[-1].n_qoi is 1:
 
-            samples = np.vstack([np.squeeze(lf_model.model_evals_pred), np.squeeze(hf_model.model_evals_pred)])
-            utils.plot_2d_kde(samples=samples.T, title='Joint and marginals')
+            for i in range(self.n_models - 1):
+                lf_model = self.models[i]
+                hf_model = self.models[i + 1]
 
-            plt.grid(b=True)
-            if self.n_models > 2:
-                plt.gcf().savefig('pngout/bmfmc_joint_dist_' + str(i + 1) + '.png', dpi=300)
-            else:
-                plt.gcf().savefig('pngout/bmfmc_joint_dist.png', dpi=300)
+                samples = np.vstack([np.squeeze(lf_model.model_evals_pred), np.squeeze(hf_model.model_evals_pred)])
+                utils.plot_2d_kde(samples=samples.T)
 
-            plt.clf()
+                plt.grid(b=True)
+                if self.n_models > 2:
+                    plt.gcf().savefig('pngout/bmfmc_joint_dist_' + str(i + 1) + '.png', dpi=300)
+                else:
+                    plt.gcf().savefig('pngout/bmfmc_joint_dist.png', dpi=300)
+
+                plt.clf()
+
+        elif self.regression_type in ['decoupled_gaussian_process', 'decoupled_heteroscedastic_gaussian_process',
+                                      'shared_gaussian_process', 'shared_heteroscedastic_gaussian_process']:
+
+            for i in range(self.n_models - 1):
+                lf_model = self.models[i]
+                hf_model = self.models[i + 1]
+
+                for j in range(self.models[-1].n_qoi):
+                    samples = np.vstack(
+                        [np.squeeze(lf_model.model_evals_pred[:, j]), np.squeeze(hf_model.model_evals_pred[:, j])])
+                    utils.plot_2d_kde(samples=samples.T)
+
+                    plt.grid(b=True)
+                    if self.n_models > 2:
+                        plt.gcf().savefig('pngout/bmfmc_joint_dist_' + str(i + 1) + '_q' + str(j + 1) + '.png', dpi=300)
+                    else:
+                        plt.gcf().savefig('pngout/bmfmc_joint_dist_q' + str(j + 1) + '.png', dpi=300)
+
+                    plt.clf()
+
+        else:
+            return

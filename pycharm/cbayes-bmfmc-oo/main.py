@@ -50,14 +50,14 @@ pf_method = 'bmfmc'
 #   - elliptic_pde supports one
 #   - lambda_p supports two
 #   - ode_pp supports arbitrary many
-#   - elliptic_pde_ml / elliptic_pde_ml_fixed supports five
+#   - elliptic_pde_ml / elliptic_pde_ml_fixed support five
 
-n_evals = [2000, 200, 50]
+n_evals = [10000, 1000, 100]
 n_models = len(n_evals)
 
 # Number of samples for the Monte Carlo reference
 
-n_mc_ref = int(1e4)
+n_mc_ref = int(5e4)
 
 # Training set selection strategies:
 #   - support_covering / support_covering_adaptive
@@ -234,31 +234,31 @@ def get_prior_prior_pf_samples():
         # Setup and load data
         if model == 'elliptic_pde_ml':
             n_qoi = 1
-            obs_loc = [0.75]
+            obs_loc = [0.74]
             obs_scale = [0.01]
 
         elif model == 'elliptic_pde_ml_2d':
             n_qoi = 2
-            obs_loc = [0.75, 0.06]
+            obs_loc = [0.74, 0.09]
             obs_scale = [0.01, 0.01]
 
         elif model == 'elliptic_pde_ml_3d':
             n_qoi = 3
-            obs_loc = [0.75, 0.06, 0.48]
+            obs_loc = [0.74, 0.09, 0.46]
             obs_scale = [0.01, 0.01, 0.01]
 
-        h = 160 / 2 ** (n_models-1)
+        h = 160 / 2 ** (n_models - 1)
         prior_pf_samples = elliptic_pde_ml.load_data(h=h, n_models=n_models)
         prior_samples = np.reshape(range(n_mc_ref), (n_mc_ref, 1))  # we only need some id here
 
         mc_model = Model(eval_fun=None, rv_samples=prior_samples, rv_samples_pred=prior_samples,
                          n_evals=n_mc_ref, n_qoi=n_qoi, rv_name='$Q$', label='Monte Carlo reference')
-        mc_model.set_model_evals(prior_pf_samples[-1][:, 0:n_qoi])
+        mc_model.set_model_evals(prior_pf_samples[-1][:n_mc_ref, 0:n_qoi])
 
         if pf_method == 'mc':
 
             # Monte Carlo reference
-            prior_pf_samples = prior_pf_samples[-1][:, 0:n_qoi]
+            prior_pf_samples = prior_pf_samples[-1][:n_mc_ref, 0:n_qoi]
             prior_pf_samples = np.reshape(prior_pf_samples, (1, n_mc_ref, n_qoi))
             prior_pf_mc_samples = prior_pf_samples
 
@@ -270,7 +270,7 @@ def get_prior_prior_pf_samples():
 
             # Create a low-fidelity model
             samples = prior_pf_samples[0][:n_evals[0], 0:n_qoi]
-            samples = samples ** 1.5  # add a bias
+            samples = samples ** 1.2  # add a bias
             lf_prior_samples = prior_samples[:n_evals[0]]
             lf_model = Model(
                 eval_fun=lambda x, samples=samples: elliptic_pde_ml.find_xy_pair(x, lf_prior_samples, samples),
@@ -286,7 +286,7 @@ def get_prior_prior_pf_samples():
             if n_models == 3:
                 # Create a mid fidelity model
                 samples = prior_pf_samples[1][:n_evals[0], 0:n_qoi]
-                samples = samples ** 1.2  # add a bias
+                samples = samples ** 1.1  # add a bias
                 mf_model = Model(
                     eval_fun=lambda x, samples=samples: elliptic_pde_ml.find_xy_pair(x, lf_prior_samples, samples),
                     n_evals=n_evals[1], n_qoi=n_qoi, rv_name='$q_1$', label='Mid-fidelity')
@@ -298,7 +298,8 @@ def get_prior_prior_pf_samples():
                     samples = prior_pf_samples[i + 1][:n_evals[0], 0:n_qoi]
                     models.append(
                         Model(
-                            eval_fun=lambda x, samples=samples: elliptic_pde_ml.find_xy_pair(x, lf_prior_samples, samples),
+                            eval_fun=lambda x, samples=samples: elliptic_pde_ml.find_xy_pair(x, lf_prior_samples,
+                                                                                             samples),
                             n_evals=n_evals[i + 1], n_qoi=n_qoi, rv_name='$q_%d$' % int(i + 1),
                             label='Mid-%d-fidelity' % int(i + 1)))
                 models.append(hf_model)
@@ -325,7 +326,7 @@ def get_prior_prior_pf_samples():
 
         elif model == 'elliptic_pde_ml_fixed_3d':
             n_qoi = 3
-            obs_loc = [0.75, 0.06, 0.48]
+            obs_loc = [0.75, 0.06, 0.45]
             obs_scale = [0.01, 0.01, 0.01]
 
         h = 160 / 2 ** (n_models - 1)
@@ -574,8 +575,7 @@ def get_prior_prior_pf_samples():
 
         bmfmc.plot_results(mc=True)
         bmfmc.plot_regression_models()
-        if n_qoi == 1:
-            bmfmc.plot_joint_densities()
+        bmfmc.plot_joint_densities()
 
         # Get prior push-forward samples
         prior_pf_samples = bmfmc.get_samples()
@@ -630,73 +630,99 @@ if __name__ == '__main__':
     # Low-fidelity and Monte Carlo comparisons
     if pf_method == 'bmfmc':
 
-        kls = np.zeros(n_models)
-        kls[-1] = cbayes_post.get_prior_post_kl()
-
-        cbayes_post.plot_posterior(fignum=5, color='C%d' % (n_models-1), label='High-fidelity')
-
-        # Create low-fidelity CBayes posteriors
-        for i in range(n_models-1):
-
-            print('Evaluating the low-fidelity posteriors %d / %d ...' % (i + 1, n_models-1))
-            p_prior_pf_lf = Distribution(prior_pf_samples[i, :, :], rv_name='$Q$', label='Prior-PF-LF')
-            cbayes_post_lf = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_lf)
-            cbayes_post_lf.setup_posterior_and_pf()
-            cbayes_post_lf.print_stats()
-
-            if i == 0:
-                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Low-fidelity')
-            elif i == 1:
-                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Mid-fidelity')
-            else:
-                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Mid-%d-fidelity' % (i + 1))
-
-            kls[i] = cbayes_post_lf.get_prior_post_kl()
-            if i == 0:
-                cbayes_post_lf.plot_results(model_tag='lf')
-
-        end = time.time()
-        print('(Low-fidelities CBayes elapsed time: %fs)\n' % (end - lap))
-        lap = time.time()
+        cbayes_post.plot_posterior(fignum=5, color='C%d' % (n_models - 1), label='High-fidelity')
 
         # Monte Carlo comparison
-        p_prior_pf_mc = Distribution(prior_pf_mc_samples, rv_name='$Q$', label='Prior-PF-MC')
+        lap = time.time()
+        p_prior_pf_mc = Distribution(prior_pf_mc_samples, rv_name='$Q$', label='Prior-PF')
         cbayes_post_mc = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_mc)
         cbayes_post_mc.setup_posterior_and_pf()
         print('Evaluating the Monte Carlo posterior ...')
         cbayes_post_mc.print_stats()
         mc_kl = cbayes_post_mc.get_prior_post_kl()
         cbayes_post_mc.plot_results(model_tag='mc')
-
-        cbayes_post_mc.plot_posterior(fignum=5, color='k', linestyle='--', label='MC reference', save_fig=True)
+        cbayes_post_mc.plot_posterior(fignum=5, color='k', linestyle='--', label='MC reference')
 
         end = time.time()
         print('(Monte Carlo CBayes elapsed time: %fs)\n' % (end - lap))
+
+        kls = np.zeros(n_models)
+        kls[-1] = cbayes_post.get_prior_post_kl()
+        pf_kls = np.zeros(n_models)
+        pf_kls[-1] = cbayes_post_mc.p_prior_pf.calculate_kl_divergence(cbayes_post.p_prior_pf)
+
+        # Create low-fidelity CBayes posteriors
         lap = time.time()
+        save_fig = False
+        for i in range(n_models - 1):
+
+            if i == n_models - 2:
+                save_fig = True
+
+            print('Evaluating the low-fidelity posteriors %d / %d ...' % (i + 1, n_models - 1))
+            p_prior_pf_lf = Distribution(prior_pf_samples[i, :, :], rv_name='$Q$', label='Prior-PF')
+            cbayes_post_lf = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_lf)
+            cbayes_post_lf.setup_posterior_and_pf()
+            cbayes_post_lf.print_stats()
+
+            if i == 0:
+                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Low-fidelity', save_fig=save_fig)
+            elif i == 1:
+                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Mid-fidelity', save_fig=save_fig)
+            else:
+                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Mid-%d-fidelity' % (i + 1),
+                                              save_fig=save_fig)
+
+            kls[i] = cbayes_post_lf.get_prior_post_kl()
+            pf_kls[i] = cbayes_post_mc.p_prior_pf.calculate_kl_divergence(cbayes_post_lf.p_prior_pf)
+            if i == 0:
+                cbayes_post_lf.plot_results(model_tag='lf')
+
+        end = time.time()
+        print('(Low-fidelities CBayes elapsed time: %fs)\n' % (end - lap))
 
         # Plot Posterior-Prior KLs
         plt.figure()
-        plt.plot(range(1, n_models+1), mc_kl * np.ones((n_models,)), 'k--', label='MC KL')
-        plt.plot(range(1, n_models+1), kls, 'k-')
+        plt.plot(range(1, n_models + 1), mc_kl * np.ones((n_models,)), 'k--', label='MC reference')
+        plt.plot(range(1, n_models + 1), kls, 'k-')
         for i in range(n_models):
             if i is 0:
                 label = 'Low-Fidelity'
-            elif i is n_models-1:
+            elif i is n_models - 1:
                 label = 'High-Fidelity'
             elif i is 1 and n_models is 3:
                 label = 'Mid-Fidelity'
             else:
-                label = 'Mid-%d-Fidelity' % (i+1)
-            plt.plot(i+1, kls[i], 'C%do' % i, markersize=10, label=label)
+                label = 'Mid-%d-Fidelity' % (i + 1)
+            plt.plot(i + 1, kls[i], 'C%do' % i, markersize=10, label=label)
         plt.grid()
         plt.legend(loc='lower right')
-        plt.xlabel('Model no.')
         plt.ylabel('KL')
-        plt.title('Prior-Posterior KLs')
+        plt.xticks([])
         plt.gcf().savefig('pngout/cbayes_prior_post_kls.png', dpi=300)
 
+        # Plot Prior-PF KLs
+        plt.figure()
+        plt.plot(range(1, n_models + 1), np.zeros((n_models,)), 'k--')
+        plt.plot(range(1, n_models + 1), pf_kls, 'k-')
+        for i in range(n_models):
+            if i is 0:
+                label = 'Low-Fidelity'
+            elif i is n_models - 1:
+                label = 'High-Fidelity'
+            elif i is 1 and n_models is 3:
+                label = 'Mid-Fidelity'
+            else:
+                label = 'Mid-%d-Fidelity' % (i + 1)
+            plt.plot(i + 1, pf_kls[i], 'C%do' % i, markersize=10, label=label)
+        plt.grid()
+        plt.legend(loc='upper right')
+        plt.ylabel('KL')
+        plt.xticks([])
+        plt.gcf().savefig('pngout/bmfmc_prior_pf_kls.png', dpi=300)
+
     # Output directory name
-    outdirname = model + '_' + training_set_strategy + '_' + regression_type
+    outdirname = model + '_' + training_set_strategy + '_' + regression_type + '_' + str(n_mc_ref)
     for i in range(len(n_evals)):
         outdirname += '_' + str(n_evals[i])
 

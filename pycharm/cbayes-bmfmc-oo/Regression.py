@@ -4,6 +4,7 @@ from sklearn.gaussian_process.kernels import WhiteKernel, RBF, ConstantKernel, D
 from sklearn.cluster import KMeans
 from gp_extras.kernels import HeteroscedasticKernel
 import pymc3 as pm
+import warnings
 
 
 class Regression:
@@ -46,8 +47,7 @@ class Regression:
             for i in range(n_qoi):
 
                 # Fit a GP regression model to approximate p(q_l|q_l-1)
-                kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF(np.ones(n_qoi)) \
-                    + WhiteKernel()
+                kernel = ConstantKernel() + ConstantKernel() * RBF(np.ones(n_qoi)) + WhiteKernel()
                 self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6,
                                                                                        n_restarts_optimizer=0))
                 self.regression_model[i].fit(self.x_train, self.y_train[:, i])
@@ -69,7 +69,7 @@ class Regression:
             for i in range(self.x_train.shape[1]):
 
                 # Fit a GP regression model to approximate p(q_l|q_l-1)
-                kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF() + WhiteKernel()
+                kernel = ConstantKernel() + ConstantKernel() * RBF() + WhiteKernel()
                 self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6))
                 self.regression_model[i].fit(np.expand_dims(self.x_train[:, i], axis=1), self.y_train[:, i])
 
@@ -91,7 +91,7 @@ class Regression:
             x_train = self.x_train.reshape((self.x_train.size, 1))
             y_train = self.y_train.reshape(self.y_train.size)
             x_pred = self.x_pred.reshape((self.x_pred.size, 1))
-            kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF() + WhiteKernel()
+            kernel = ConstantKernel() + ConstantKernel() * RBF() + WhiteKernel()
             self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6)
             self.regression_model.fit(x_train, y_train)
             mu, sigma = self.regression_model.predict(x_pred, return_std=True)
@@ -116,8 +116,8 @@ class Regression:
                 # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
                 # See here for more info: https://github.com/jmetzen/gp_extras/
                 prototypes = KMeans(n_clusters=5).fit(self.x_train).cluster_centers_
-                kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF(np.ones(self.y_train.shape[1])) \
-                    + HeteroscedasticKernel.construct(prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
+                kernel = ConstantKernel() + ConstantKernel() * RBF(np.ones(self.y_train.shape[1])) \
+                    + HeteroscedasticKernel.construct(prototypes, 1e-3, (1e-10, 5e1), gamma=5.0, gamma_bounds="fixed")
                 self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6))
                 self.regression_model[i].fit(self.x_train, self.y_train[:, i])
 
@@ -140,8 +140,8 @@ class Regression:
                 # Fit a heteroscedastic GP regression model with spatially varying noise to approximate p(q_l|q_l-1)
                 # See here for more info: https://github.com/jmetzen/gp_extras/
                 prototypes = KMeans(n_clusters=5).fit(np.expand_dims(self.x_pred[:, i], axis=1)).cluster_centers_
-                kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF() \
-                    + HeteroscedasticKernel.construct(prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
+                kernel = ConstantKernel() + ConstantKernel() * RBF() \
+                    + HeteroscedasticKernel.construct(prototypes, 1e-3, (1e-10, 5e1), gamma=5.0, gamma_bounds="fixed")
                 self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6))
                 self.regression_model[i].fit(np.expand_dims(self.x_train[:, i], axis=1), self.y_train[:, i])
 
@@ -165,7 +165,7 @@ class Regression:
             y_train = self.y_train.reshape(self.y_train.size)
             x_pred = self.x_pred.reshape((self.x_pred.size, 1))
             prototypes = KMeans(n_clusters=5*self.x_pred.shape[1]).fit(x_pred).cluster_centers_
-            kernel = ConstantKernel() * DotProduct() + ConstantKernel() * RBF() \
+            kernel = ConstantKernel() + ConstantKernel() * RBF() \
                 + HeteroscedasticKernel.construct(prototypes, 1e-3, (1e-10, 50.0), gamma=5.0, gamma_bounds="fixed")
             self.regression_model = gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6)
             self.regression_model.fit(x_train, y_train)
@@ -214,6 +214,12 @@ class Regression:
         else:
             print('Unknown regression model %s.' % self.regression_type)
             exit()
+
+        # Replace INF or NAN predictions
+        if np.isinf(hf_model_evals_pred).any() or np.isnan(hf_model_evals_pred).any():
+            warnings.warn('Detected INF or NAN values in the predictions, replacing them with the sample mean.')
+            mask = np.isnan(hf_model_evals_pred) | np.isinf(hf_model_evals_pred)
+            hf_model_evals_pred[mask] = np.mean(hf_model_evals_pred[~mask], axis=0)
 
         return hf_model_evals_pred
 

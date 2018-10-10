@@ -95,7 +95,7 @@ class Distribution:
         return kl
 
     # Plot the KDE density
-    def plot_kde(self, fignum=1, color='C0', linestyle='-', xmin=0.0, xmax=1.0, title='KDE', label=None):
+    def plot_kde(self, fignum=1, color='C0', linestyle='-', xmin=0.0, xmax=1.0, title='', label=None):
         if label is None:
             label = self.label
         if self.n_dim == 1:
