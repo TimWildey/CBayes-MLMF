@@ -1,31 +1,33 @@
-# cbayes-bmfmc-oo folder
+# cbayes-mfmc folder
 
 ## BMFMC.py
-* Driver for the Bayesian multi-fidelity Monte Carlo framework.
+Driver for the Bayesian multi-fidelity Monte Carlo framework.
 
 ## CBayes.py
-* Driver for the CBayes framework.
+Driver for the CBayes framework.
 
 ## Distribution.py
-* A distribution data structure.
+A data structure for probability densities.
 
 ## Model.py
-* A data structure for models.
+A data structure for computational models.
 
 ## Regression.py
-* A data structure for regression model.
+A data structure for regression models.
 
 ## utils.py
-* Plotting functionality.
+Plotting functionality.
 
 ## models/
 Includes some model problems to generate samples from:
-* elliptic_pde.py: the single-phase incompressible flow model
-* lambda_p.py: the polynomial lambda^p problem
-* ode_pp.py: a preditor-prey ODE model with 4 random variables
+* elliptic_pde.py: a single-phase incompressible flow model
+* lambda_p.py: a polynomial model
 
 ## output/
 Figures are stored in here as well as console output.
+
+## convergence_studies/
+Some scripts to examine the convergence behavior.
 
 ---
 
@@ -43,5 +45,5 @@ Figures are stored in here as well as console output.
 
 ## Usage
 
-* There is one main.py script which can be run.
+* There is a main.py script to run the framework.
 * It has a config section to specify the models & methods.

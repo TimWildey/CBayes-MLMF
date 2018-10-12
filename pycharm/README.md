@@ -1,7 +1,7 @@
 # Pycharm project folder
 
-### cbayes-bmfmc-oo
-* A flexible, object-oriented code to work with
+### cbayes-mfmc
+* A Python code environment with some flexibility
 
 ---
 
