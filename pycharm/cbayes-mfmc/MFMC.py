@@ -9,10 +9,10 @@ from Regression import Regression
 from Distribution import Distribution
 
 
-class BMFMC:
+class MFMC:
 
     # Class attributes:
-    # - models: a list of all models for BMFMC (i.e. at least one high-fidelity and one low-fidelity model)
+    # - models: a list of all models for MFMC (i.e. at least one high-fidelity and one low-fidelity model)
     # - mc_model: the Monte Carlo reference model (computed only if calculate_mc_reference() is called)
     # - n_models: number of models
     # - training_set_selection: strategy for training set selection
@@ -28,8 +28,8 @@ class BMFMC:
         self.regression_type = regression_type
         self.regression_models = []
 
-    # Main method in bmfmc: evaluate, regress, predict
-    def apply_bmfmc_framework(self):
+    # Main method in mfmc: evaluate, regress, predict
+    def apply_mfmc_framework(self):
 
         for i in range(self.n_models - 1):
 
@@ -131,8 +131,8 @@ class BMFMC:
         self.mc_model.set_model_evals_pred(self.mc_model.model_evals)
         self.mc_model.create_distribution()
 
-    # Calculate BMFMC estimator variance of the distribution mean
-    def calculate_bmfmc_mean_estimator_variance(self):
+    # Calculate MFMC estimator variance of the distribution mean
+    def calculate_mfmc_mean_estimator_variance(self):
 
         if self.n_models == 2 and self.models[0].n_qoi == 1:
             regression_model = self.regression_models[0]
@@ -140,10 +140,10 @@ class BMFMC:
             return np.mean(sigma ** 2, axis=0)
 
         else:
-            return self.calculate_bmfmc_expectation_estimator_variance()
+            return self.calculate_mfmc_expectation_estimator_variance()
 
     # Calculate the CDF
-    def calculate_bmfmc_cdf(self, n_vals=10):
+    def calculate_mfmc_cdf(self, n_vals=10):
 
         if self.models[0].n_qoi > 1:
             print('This only works for one QoI so far...')
@@ -169,7 +169,7 @@ class BMFMC:
         return np.mean(cdf_samples, 0), y_range
 
     # Calculate CDF estimator error bars
-    def calculate_bmfmc_cdf_estimator_variance(self, n_vals=10):
+    def calculate_mfmc_cdf_estimator_variance(self, n_vals=10):
 
         if self.models[0].n_qoi > 1:
             print('This only works for one QoI so far...')
@@ -204,20 +204,20 @@ class BMFMC:
             print('')
             for i in range(y_range.shape[0]):
                 print('CDF errors %d / %d' % (i + 1, y_range.shape[0]))
-                cdf_var[i] = self.calculate_bmfmc_expectation_estimator_variance(lambda x: (x < y_range[i]))
+                cdf_var[i] = self.calculate_mfmc_expectation_estimator_variance(lambda x: (x < y_range[i]))
 
             return cdf_var, y_range
 
     # Calculate the expected value of an arbitrary function
-    def calculate_bmfmc_expectation(self, fun=lambda x: x):
+    def calculate_mfmc_expectation(self, fun=lambda x: x):
 
         samples = self.models[-1].model_evals_pred
         exp_samples = fun(samples)
 
         return np.mean(exp_samples, 0)
 
-    # Estimate the BMFMC estimator variance of some arbitrary expectation value
-    def calculate_bmfmc_expectation_estimator_variance(self, fun=lambda x: x):
+    # Estimate the MFMC estimator variance of some arbitrary expectation value
+    def calculate_mfmc_expectation_estimator_variance(self, fun=lambda x: x):
 
         regression_model = self.regression_models[0]
         mu = regression_model.mu
@@ -272,7 +272,7 @@ class BMFMC:
         return np.mean(exp_var_samples, 0)
 
     # Estimate the probability density at some point
-    def calculate_bmfmc_density_expectation(self, val):
+    def calculate_mfmc_density_expectation(self, val):
 
         if self.models[0].n_qoi > 1:
             print('This only works for one QoI so far...')
@@ -296,13 +296,13 @@ class BMFMC:
     def print_stats(self, mc=False):
 
         print('')
-        print('########### BMFMC statistics ###########')
+        print('########### MFMC statistics ###########')
         print('')
         if mc and self.mc_model != 0:
             print('MC mean:\t\t\t\t\t\t%s' % self.mc_model.distribution.mean())
             print('MC std:\t\t\t\t\t\t\t%s' % self.mc_model.distribution.std())
             print('')
-            print('MC-BMFMC KL:\t\t\t\t\t%f' % self.mc_model.distribution.calculate_kl_divergence(
+            print('MC-MFMC KL:\t\t\t\t\t\t%f' % self.mc_model.distribution.calculate_kl_divergence(
                 self.models[-1].distribution))
         elif mc and self.mc_model == 0:
             print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
@@ -321,17 +321,17 @@ class BMFMC:
         print('High-fidelity mean:\t\t\t\t%s' % self.models[-1].distribution.mean())
         print('High-fidelity std:\t\t\t\t%s' % self.models[-1].distribution.std())
         print('')
-        bmfmc_mean = self.calculate_bmfmc_expectation(fun=lambda x: x)
-        bmfmc_mean_error = np.sqrt(self.calculate_bmfmc_mean_estimator_variance())
-        print('BMFMC mean estimator abs err:\t%s' % bmfmc_mean_error)
-        print('BMFMC mean estimator rel err:\t%s' % (bmfmc_mean_error / np.abs(bmfmc_mean)))
-        bmfmc_std = self.models[-1].distribution.std()
-        bmfmc_var = self.models[-1].distribution.var()
-        bmfmc_var_error = np.sqrt(
-            self.calculate_bmfmc_expectation_estimator_variance(fun=lambda x: (x - bmfmc_mean) ** 2))
-        bmfmc_std_error = np.sqrt(bmfmc_var + bmfmc_var_error) - bmfmc_std
-        print('BMFMC std estimator abs err:\t%s' % bmfmc_std_error)
-        print('BMFMC std estimator rel err:\t%s' % (bmfmc_std_error / bmfmc_std))
+        mfmc_mean = self.calculate_mfmc_expectation(fun=lambda x: x)
+        mfmc_mean_error = np.sqrt(self.calculate_mfmc_mean_estimator_variance())
+        print('MFMC mean estimator abs err:\t%s' % mfmc_mean_error)
+        print('MFMC mean estimator rel err:\t%s' % (mfmc_mean_error / np.abs(mfmc_mean)))
+        mfmc_std = self.models[-1].distribution.std()
+        mfmc_var = self.models[-1].distribution.var()
+        mfmc_var_error = np.sqrt(
+            self.calculate_mfmc_expectation_estimator_variance(fun=lambda x: (x - mfmc_mean) ** 2))
+        mfmc_std_error = np.sqrt(mfmc_var + mfmc_var_error) - mfmc_std
+        print('MFMC std estimator abs err:\t\t%s' % mfmc_std_error)
+        print('MFMC std estimator rel err:\t\t%s' % (mfmc_std_error / mfmc_std))
         print('')
         kl = self.models[-2].distribution.calculate_kl_divergence(self.models[-1].distribution)
         print('Relative information gain:\t\t%f' % kl)
@@ -342,7 +342,7 @@ class BMFMC:
         print('########################################')
         print('')
 
-    # Plot BMFMC distributions
+    # Plot MFMC distributions
     def plot_results(self, mc=False):
 
         if self.models[0].n_qoi == 1:
@@ -364,13 +364,13 @@ class BMFMC:
                 exit()
 
             plt.grid(b=True)
-            plt.gcf().savefig('output/bmfmc_densities.eps', dpi=300)
+            plt.gcf().savefig('output/mfmc_densities.eps', dpi=300)
 
         else:
             # Seaborn pairplot of the high-fidelity push-forward
             utils.plot_multi_qoi(samples=self.models[-1].model_evals_pred)
             plt.grid(b=True)
-            plt.gcf().savefig('output/bmfmc_hf_pairplot.eps', dpi=300)
+            plt.gcf().savefig('output/mfmc_hf_pairplot.eps', dpi=300)
             plt.clf()
 
             # Plot marginals
@@ -411,7 +411,7 @@ class BMFMC:
                 if mc and self.mc_model is not None:
                     samples = self.mc_model.distribution.samples[:, k]
                     samples = np.expand_dims(samples, axis=1)
-                    marginal = Distribution(samples, label='Monte Carlo reference', rv_name=rv_name)
+                    marginal = Distribution(samples, label='MC reference', rv_name=rv_name)
                     marginal.plot_kde(fignum=1, color='k', linestyle='--', xmin=xmin, xmax=xmax)
 
                 elif mc and self.mc_model is None:
@@ -419,7 +419,7 @@ class BMFMC:
                     exit()
 
                 plt.grid(b=True)
-                plt.gcf().savefig('output/bmfmc_densities_q%d.eps' % (k + 1), dpi=300)
+                plt.gcf().savefig('output/mfmc_densities_q%d.eps' % (k + 1), dpi=300)
                 plt.clf()
 
         if self.models[0].n_qoi == 2:
@@ -440,7 +440,7 @@ class BMFMC:
             plt.legend(loc='upper right')
             plt.grid(b=True)
 
-            plt.gcf().savefig('output/bmfmc_dists.eps', dpi=300)
+            plt.gcf().savefig('output/mfmc_dists.eps', dpi=300)
             xmin, xmax = plt.xlim()
             ymin, ymax = plt.ylim()
             plt.clf()
@@ -448,19 +448,19 @@ class BMFMC:
             self.models[0].distribution.plot_kde()
             plt.xlim([xmin, xmax])
             plt.ylim([ymin, ymax])
-            plt.gcf().savefig('output/bmfmc_lf.eps', dpi=300)
+            plt.gcf().savefig('output/mfmc_lf.eps', dpi=300)
             plt.clf()
 
             self.models[-1].distribution.plot_kde()
             plt.xlim([xmin, xmax])
             plt.ylim([ymin, ymax])
-            plt.gcf().savefig('output/bmfmc_hf.eps', dpi=300)
+            plt.gcf().savefig('output/mfmc_hf.eps', dpi=300)
 
             if mc and self.mc_model is not None:
                 self.mc_model.distribution.plot_kde()
                 plt.xlim([xmin, xmax])
                 plt.ylim([ymin, ymax])
-                plt.gcf().savefig('output/bmfmc_mc.eps', dpi=300)
+                plt.gcf().savefig('output/mfmc_mc.eps', dpi=300)
             elif mc and self.mc_model is None:
                 print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
                 exit()
@@ -513,7 +513,7 @@ class BMFMC:
                     utils.plot_1d_data(x_train[:, k], y_train[:, k], marker='*', linestyle='', markersize=5, color='k',
                                        label='Training data', xlabel=lf_model.rv_name, ylabel=hf_model.rv_name)
 
-                    plt.gcf().savefig('output/bmfmc_regression_model_' + str(i + 1) + '_q' + str(k + 1) + '.eps',
+                    plt.gcf().savefig('output/mfmc_regression_model_' + str(i + 1) + '_q' + str(k + 1) + '.eps',
                                       dpi=300)
                     plt.clf()
                 continue
@@ -557,9 +557,9 @@ class BMFMC:
 
             plt.grid(b=True)
             if self.n_models > 2:
-                plt.gcf().savefig('output/bmfmc_regression_model_' + str(i + 1) + '.eps', dpi=300)
+                plt.gcf().savefig('output/mfmc_regression_model_' + str(i + 1) + '.eps', dpi=300)
             else:
-                plt.gcf().savefig('output/bmfmc_regression_model.eps', dpi=300)
+                plt.gcf().savefig('output/mfmc_regression_model.eps', dpi=300)
 
             plt.clf()
 
@@ -577,9 +577,9 @@ class BMFMC:
 
                 plt.grid(b=True)
                 if self.n_models > 2:
-                    plt.gcf().savefig('output/bmfmc_joint_dist_' + str(i + 1) + '.eps', dpi=300)
+                    plt.gcf().savefig('output/mfmc_joint_dist_' + str(i + 1) + '.eps', dpi=300)
                 else:
-                    plt.gcf().savefig('output/bmfmc_joint_dist.eps', dpi=300)
+                    plt.gcf().savefig('output/mfmc_joint_dist.eps', dpi=300)
 
                 plt.clf()
 
@@ -597,9 +597,9 @@ class BMFMC:
 
                     plt.grid(b=True)
                     if self.n_models > 2:
-                        plt.gcf().savefig('output/bmfmc_joint_dist_' + str(i + 1) + '_q' + str(j + 1) + '.eps', dpi=300)
+                        plt.gcf().savefig('output/mfmc_joint_dist_' + str(i + 1) + '_q' + str(j + 1) + '.eps', dpi=300)
                     else:
-                        plt.gcf().savefig('output/bmfmc_joint_dist_q' + str(j + 1) + '.eps', dpi=300)
+                        plt.gcf().savefig('output/mfmc_joint_dist_q' + str(j + 1) + '.eps', dpi=300)
 
                     plt.clf()
 

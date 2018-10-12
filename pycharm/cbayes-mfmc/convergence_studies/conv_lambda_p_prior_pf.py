@@ -8,7 +8,7 @@ import lambda_p
 # Framework stuff
 from Distribution import Distribution
 from Model import Model
-from BMFMC import BMFMC
+from MFMC import MFMC
 
 # ------------------------------------------------- Config - General -------- #
 
@@ -17,7 +17,7 @@ np.random.seed(42)
 # Number of lowest-fidelity samples (1e4 should be fine for 1 QoI)
 n_mc_ref = int(1e4)
 
-# ----------------------------------------------------Config - BMFMC -------- #
+# ----------------------------------------------------Config - MFMC -------- #
 
 # Training set selection strategy (support_covering, support_covering_adaptive, sampling, sampling_adaptive)
 training_set_strategy = 'support_covering'
@@ -34,14 +34,14 @@ if __name__ == '__main__':
 
     n_evals_mc = np.logspace(np.log10(5), np.log10(1000), 15)
     n_evals_mc = np.round(n_evals_mc).astype(int)
-    n_evals_bmfmc_hf = np.logspace(np.log10(5), np.log10(200), 10)
-    n_evals_bmfmc_hf = np.round(n_evals_bmfmc_hf).astype(int)
-    n_evals_bmfmc_mf = n_fac_mf * n_evals_bmfmc_hf
-    n_evals_bmfmc_lf = [n_mc_ref] * 10
-    n_evals_all = n_evals_mc.tolist() + list(set(n_evals_bmfmc_hf.tolist()) - set(n_evals_mc.tolist()))
+    n_evals_mfmc_hf = np.logspace(np.log10(5), np.log10(200), 10)
+    n_evals_mfmc_hf = np.round(n_evals_mfmc_hf).astype(int)
+    n_evals_mfmc_mf = n_fac_mf * n_evals_mfmc_hf
+    n_evals_mfmc_lf = [n_mc_ref] * 10
+    n_evals_all = n_evals_mc.tolist() + list(set(n_evals_mfmc_hf.tolist()) - set(n_evals_mc.tolist()))
     n_evals_all.sort()
 
-    costs_hf = n_evals_bmfmc_hf
+    costs_hf = n_evals_mfmc_hf
     costs_mf = 0.0 * costs_hf
     costs_lf = 0.0 * costs_mf
     total_costs_1lf = costs_hf + costs_lf
@@ -88,9 +88,9 @@ if __name__ == '__main__':
     # -------------- 1 HF, 1 LF
 
     kls_prior_pf_1hf_1lf = []
-    for idx, n_evals in enumerate(n_evals_bmfmc_hf):
-        print('\nCalculating BMFMC model %d / %d ...' % (idx + 1, len(n_evals_bmfmc_hf)))
-        n_evals = [n_evals_bmfmc_lf[idx], n_evals]
+    for idx, n_evals in enumerate(n_evals_mfmc_hf):
+        print('\nCalculating MFMC model %d / %d ...' % (idx + 1, len(n_evals_mfmc_hf)))
+        n_evals = [n_evals_mfmc_lf[idx], n_evals]
 
         # Create a low-fidelity model
         lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_lf), rv_samples=prior_samples[:n_evals[0]],
@@ -104,13 +104,13 @@ if __name__ == '__main__':
 
         models = [lf_model, hf_model]
 
-        # Setup BMFMC
-        bmfmc = BMFMC(models=models,
-                      training_set_strategy=training_set_strategy, regression_type=regression_type)
+        # Setup MFMC
+        mfmc = MFMC(models=models,
+                     training_set_strategy=training_set_strategy, regression_type=regression_type)
 
-        # Apply BMFMC
-        bmfmc.apply_bmfmc_framework()
-        prior_pf_samples = bmfmc.get_samples()[-1, :, :]
+        # Apply MFMC
+        mfmc.apply_mfmc_framework()
+        prior_pf_samples = mfmc.get_samples()[-1, :, :]
         p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
         # kl between prior push-forward and reference push-forward
@@ -119,9 +119,9 @@ if __name__ == '__main__':
     # -------------- 1 HF, 2 LF
 
     kls_prior_pf_1hf_2lf = []
-    for idx, n_evals in enumerate(n_evals_bmfmc_hf):
-        n_evals = [n_evals_bmfmc_lf[idx], n_evals_bmfmc_mf[idx], n_evals]
-        print('\nCalculating BMFMC multi-model %d / %d ...' % (idx + 1, len(n_evals_bmfmc_hf)))
+    for idx, n_evals in enumerate(n_evals_mfmc_hf):
+        n_evals = [n_evals_mfmc_lf[idx], n_evals_mfmc_mf[idx], n_evals]
+        print('\nCalculating MFMC multi-model %d / %d ...' % (idx + 1, len(n_evals_mfmc_hf)))
 
         # Create a low-fidelity model
         lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_lf), rv_samples=prior_samples[:n_evals[0]],
@@ -138,13 +138,13 @@ if __name__ == '__main__':
 
         models = [lf_model, mf_model, hf_model]
 
-        # Setup BMFMC
-        bmfmc = BMFMC(models=models,
-                      training_set_strategy=training_set_strategy, regression_type=regression_type)
+        # Setup MFMC
+        mfmc = MFMC(models=models,
+                     training_set_strategy=training_set_strategy, regression_type=regression_type)
 
-        # Apply BMFMC
-        bmfmc.apply_bmfmc_framework()
-        prior_pf_samples = bmfmc.get_samples()[-1, :, :]
+        # Apply MFMC
+        mfmc.apply_mfmc_framework()
+        prior_pf_samples = mfmc.get_samples()[-1, :, :]
         p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
         # kl between prior push-forward and reference push-forward

@@ -1,7 +1,7 @@
 # cbayes-mfmc folder
 
-## BMFMC.py
-Driver for the Bayesian multi-fidelity Monte Carlo framework.
+## MFMC.py
+Driver for the Multi-fidelity Monte Carlo framework.
 
 ## CBayes.py
 Driver for the CBayes framework.
