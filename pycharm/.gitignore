@@ -1,7 +1,7 @@
 .DS_Store
 /cbayes-bmfmc-oo/__pycache__/
 /cbayes-bmfmc-oo/models/__pycache__/
-/cbayes-bmfmc-oo/output/*
-/cbayes-bmfmc-oo/convergence_studies/paper/*
+/cbayes-bmfmc-oo/output/
+/cbayes-bmfmc-oo/convergence_studies/paper/
 /cbayes-bmfmc-oo/convergence_studies/*.eps
 /.idea/

@@ -3,68 +3,66 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Model stuff
-import elliptic_pde_ml
+import lambda_p
 
 # Framework stuff
 from Distribution import Distribution
 from Model import Model
 from BMFMC import BMFMC
-from CBayes import CBayesPosterior
 
 # ------------------------------------------------- Config - General -------- #
 
 np.random.seed(42)
 
 # Number of lowest-fidelity samples (1e4 should be fine for 1 QoI)
-n_mc_ref = int(5e4)
+n_mc_ref = int(1e4)
 
 # ----------------------------------------------------Config - BMFMC -------- #
 
 # Training set selection strategy (support_covering, support_covering_adaptive, sampling, sampling_adaptive)
-training_set_strategy = 'sampling'
+training_set_strategy = 'support_covering'
 
-# Regression model type (gaussian_process, heteroscedastic_gaussian_process, decoupled_heteroscedastic_gaussian_process)
-regression_type = 'heteroscedastic_gaussian_process'
+# Regression model type (gaussian_process, heteroscedastic_gaussian_process)
+regression_type = 'gaussian_process'
 
 # ------------------------------------------------------------- Main -------- #
 
 if __name__ == '__main__':
 
-    # 10, 50 works good
-    n_fac_mf = 10
-    n_fac_lf = 50
+    n_fac_mf = 2
+    n_fac_lf = 100
 
-    n_evals_mc = np.logspace(np.log10(15), np.log10(1200), 10)
+    n_evals_mc = np.logspace(np.log10(5), np.log10(1000), 15)
     n_evals_mc = np.round(n_evals_mc).astype(int)
-    n_evals_bmfmc_hf = np.logspace(np.log10(10), np.log10(500), 10)
+    n_evals_bmfmc_hf = np.logspace(np.log10(5), np.log10(200), 10)
     n_evals_bmfmc_hf = np.round(n_evals_bmfmc_hf).astype(int)
-    n_evals_bmfmc_mf = np.logspace(np.log10(20), np.log10(500), 10)
-    n_evals_bmfmc_mf = np.round(n_evals_bmfmc_mf).astype(int)
-    n_evals_bmfmc_lf = np.logspace(np.log10(200), np.log10(10000), 10)
-    n_evals_bmfmc_lf = np.round(n_evals_bmfmc_lf).astype(int)
-    # n_evals_bmfmc_mf = n_fac_mf * n_evals_bmfmc_hf
-    # n_evals_bmfmc_lf = n_fac_lf * n_evals_bmfmc_hf
+    n_evals_bmfmc_mf = n_fac_mf * n_evals_bmfmc_hf
+    n_evals_bmfmc_lf = [n_mc_ref] * 10
     n_evals_all = n_evals_mc.tolist() + list(set(n_evals_bmfmc_hf.tolist()) - set(n_evals_mc.tolist()))
     n_evals_all.sort()
 
-    costs_hf = 1.0
-    costs_mf = 0.25 * costs_hf
-    costs_lf = 0.25 * costs_mf
-    total_costs_1lf = (costs_hf + costs_lf) * n_evals_bmfmc_hf + costs_lf * n_evals_bmfmc_lf
+    costs_hf = n_evals_bmfmc_hf
+    costs_mf = 0.0 * costs_hf
+    costs_lf = 0.0 * costs_mf
+    total_costs_1lf = costs_hf + costs_lf
     total_costs_1lf = np.round(total_costs_1lf).astype(int)
-    total_costs_2lf = (costs_hf + costs_mf) * n_evals_bmfmc_hf + (costs_mf + costs_lf) * n_evals_bmfmc_mf + costs_lf * n_evals_bmfmc_lf
+    total_costs_2lf = costs_hf + costs_mf + costs_lf
     total_costs_2lf = np.round(total_costs_2lf).astype(int)
 
-    # Load data
-    n_qoi = 3
-    prior_pf_samples = elliptic_pde_ml.load_data(h=40, n_models=3)
-    prior_pf_samples_hf = prior_pf_samples[-1][:, 0:n_qoi]
-    prior_pf_samples_mf = prior_pf_samples[1][:, 0:n_qoi] ** 1.1
-    prior_pf_samples_lf = prior_pf_samples[0][:, 0:n_qoi] ** 1.2
-    prior_samples = np.reshape(range(n_mc_ref), (n_mc_ref, 1))  # we only need some id here
+    # lambda_p model
+    n_qoi = 1
+    prior_samples = lambda_p.get_prior_samples(n_mc_ref)
 
-    # Create the MC reference samples
-    ref_prior_pf_samples = prior_pf_samples_hf[:n_mc_ref]
+    # Create the MC reference model
+    print('\nCalculating MC reference ...')
+    p_hf = 5
+    p_mf = 3
+    p_lf = 1
+    ref_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), rv_samples=prior_samples,
+                      n_evals=n_mc_ref, n_qoi=n_qoi, rv_name='$Q$', label='MC reference')
+
+    # Brute force Monte Carlo
+    ref_prior_pf_samples = ref_model.evaluate()
 
     # Prior
     p_prior = Distribution(prior_samples, rv_name='$\lambda$', label='Prior', kde=False)
@@ -72,18 +70,16 @@ if __name__ == '__main__':
     # Prior push-forward
     ref_p_prior_pf = Distribution(ref_prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-    # Pre evaluations
-    ref_prior_pf_samples = np.squeeze(ref_prior_pf_samples)
-    ref_p_prior_pf_evals = ref_p_prior_pf.kernel_density(ref_prior_pf_samples.T)
-
     # -------------- 1 HF
 
     kls_prior_pf_1hf = []
     for idx, n_evals in enumerate(n_evals_mc):
         print('\nCalculating MC model %d / %d ...' % (idx + 1, len(n_evals_mc)))
+        model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), rv_samples=prior_samples[0:n_evals, :],
+                      n_evals=n_evals, n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
         # Brute force Monte Carlo
-        prior_pf_samples = prior_pf_samples_hf[0:n_evals]
+        prior_pf_samples = model.evaluate()
         p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
         # kl between prior push-forward and reference push-forward
@@ -97,15 +93,14 @@ if __name__ == '__main__':
         n_evals = [n_evals_bmfmc_lf[idx], n_evals]
 
         # Create a low-fidelity model
-        lf_model = Model(
-            eval_fun=lambda x, samples=prior_pf_samples_lf: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
-            rv_samples=prior_samples[:n_evals[0]], rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0],
-            n_qoi=n_qoi, rv_name='$q_0$', label='Low-fidelity')
+        lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_lf), rv_samples=prior_samples[:n_evals[0]],
+                         rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0], n_qoi=n_qoi,
+                         rv_name='$q_0$', label='Low-fidelity')
 
         # Create a high-fidelity model
-        hf_model = Model(
-            eval_fun=lambda x, samples=prior_pf_samples_hf: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
-            n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
+        hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), n_evals=n_evals[-1],
+                         n_qoi=n_qoi,
+                         rv_name='$Q$', label='High-fidelity')
 
         models = [lf_model, hf_model]
 
@@ -129,20 +124,17 @@ if __name__ == '__main__':
         print('\nCalculating BMFMC multi-model %d / %d ...' % (idx + 1, len(n_evals_bmfmc_hf)))
 
         # Create a low-fidelity model
-        lf_model = Model(
-            eval_fun=lambda x, samples=prior_pf_samples_lf: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
-            rv_samples=prior_samples[:n_evals[0]], rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0],
-            n_qoi=n_qoi, rv_name='$q_0$', label='Low-fidelity')
+        lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_lf), rv_samples=prior_samples[:n_evals[0]],
+                         rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0], n_qoi=n_qoi,
+                         rv_name='$q_0$', label='Low-fidelity')
 
         # Create a mid-fidelity model
-        mf_model = Model(
-            eval_fun=lambda x, samples=prior_pf_samples_mf: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
-            n_evals=n_evals[1], n_qoi=n_qoi, rv_name='$q_1$', label='Mid-fidelity')
+        mf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_mf), n_evals=n_evals[1],
+                         n_qoi=n_qoi, rv_name='$q_1$', label='Mid-fidelity')
 
         # Create a high-fidelity model
-        hf_model = Model(
-            eval_fun=lambda x, samples=prior_pf_samples_hf: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
-            n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
+        hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), n_evals=n_evals[-1],
+                         n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
         models = [lf_model, mf_model, hf_model]
 
@@ -163,10 +155,10 @@ if __name__ == '__main__':
     plt.semilogx(np.squeeze(total_costs_1lf), kls_prior_pf_1hf_1lf, '-o', label='1 HF, 1 LF')
     plt.semilogx(np.squeeze(total_costs_2lf), kls_prior_pf_1hf_2lf, '-o', label='1 HF, 1 MF, 1 LF')
     plt.semilogx(np.squeeze(n_evals_all), np.zeros((len(n_evals_all))), 'k--')
-    plt.xlabel('Costs')
+    plt.xlabel('No. HF samples')
     plt.ylabel('KL')
     plt.legend(loc='upper right')
     plt.grid(b=True)
-    plt.gcf().savefig('elliptic_pde_ml_3qoi_prior_pf_convergence.eps', dpi=300)
+    plt.gcf().savefig('lambda_p_prior_pf_convergence.eps', dpi=300)
 
 # --------------------------------------------------------------------------- #

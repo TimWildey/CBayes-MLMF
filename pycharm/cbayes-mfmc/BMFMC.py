@@ -27,8 +27,6 @@ class BMFMC:
         self.training_set_strategy = training_set_strategy
         self.regression_type = regression_type
         self.regression_models = []
-        self.adaptive = True
-        self.adaptive_tol = 2.0e-3
 
     # Main method in bmfmc: evaluate, regress, predict
     def apply_bmfmc_framework(self):
@@ -37,14 +35,13 @@ class BMFMC:
 
             lf_model = self.models[i]
             hf_model = self.models[i + 1]
-            self.adaptive = True
 
             if self.n_models == 2:
                 print('')
                 print('Training the conditional model ...')
             else:
                 print('')
-                print('Creating conditional model %d / %d ...' % (i + 1, self.n_models - 1))
+                print('Training conditional model %d / %d ...' % (i + 1, self.n_models - 1))
 
             # 1) Evaluate the lowest-fidelity model
             if i == 0:
@@ -52,54 +49,19 @@ class BMFMC:
                 lf_model.set_model_evals_pred(lf_model.model_evals)
                 lf_model.create_distribution()
 
-            # Add samples adaptively until convergence
-            previous_dist = lf_model.distribution
-            x_train = None
-            adaptive_run = 0
+            # 2) Select lower-fidelity model evaluation points and evaluate the next higher-fidelity model
+            x_train = self.create_training_set(lf_model=lf_model, hf_model=hf_model, id=i)
+            y_train = hf_model.evaluate()
 
-            while self.adaptive:
-                adaptive_run += 1
-
-                # 2) Select lower-fidelity model evaluation points and evaluate the next higher-fidelity model
-                if x_train is None:
-                    x_train = self.create_training_set(lf_model=lf_model, hf_model=hf_model, id=i)
-                else:
-                    x_train = np.append(x_train, self.create_training_set(lf_model=lf_model, hf_model=hf_model, id=i),
-                                        axis=0)
-                y_train = hf_model.evaluate()
-
-                # 3) Fit a regression model to approximate p(q_l|q_l-1), predict q_l|q_l-1 at all low-fidelity samples,
-                #    generate low-fidelity samples from the predictions and create a distribution
-                hf_model_evals_pred = self.build_regression_predict_and_sample(x_train=x_train, y_train=y_train,
-                                                                               x_pred=lf_model.model_evals_pred,
-                                                                               id=i)
-                hf_model.set_rv_samples_pred(lf_model.rv_samples_pred)
-                hf_model.set_model_evals_pred(hf_model_evals_pred.reshape((self.models[0].n_evals, hf_model.n_qoi)))
-                hf_model.create_distribution()
-
-                # 4) Check convergence
-                if self.adaptive:
-                    n_evals = np.shape(hf_model.rv_samples)[0]
-                    self.check_adaptive_convergence(this_dist=hf_model.distribution, previous_dist=previous_dist,
-                                                    adaptive_run=adaptive_run, n_evals=n_evals)
-                    previous_dist = hf_model.distribution
+            # 3) Fit a regression model to approximate p(q_l|q_l-1), predict q_l|q_l-1 at all low-fidelity samples,
+            #    generate low-fidelity samples from the predictions and create a distribution
+            hf_model_evals_pred = self.build_regression_predict_and_sample(x_train=x_train, y_train=y_train,
+                                                                           x_pred=lf_model.model_evals_pred, id=i)
+            hf_model.set_rv_samples_pred(lf_model.rv_samples_pred)
+            hf_model.set_model_evals_pred(hf_model_evals_pred.reshape((self.models[0].n_evals, hf_model.n_qoi)))
+            hf_model.create_distribution()
 
         return self.models[-1].model_evals_pred
-
-    # Check for convergence in terms of the KL to the previous model with less samples
-    def check_adaptive_convergence(self, this_dist, previous_dist, adaptive_run, n_evals):
-
-        kl = this_dist.calculate_kl_divergence(previous_dist)
-
-        print('')
-        print('Adaptive run %d, KL: %f' % (adaptive_run, kl))
-
-        if kl <= self.adaptive_tol:
-            self.adaptive = False
-            print('Converged after %d model evaluations.' % n_evals)
-        elif adaptive_run >= 20:
-            print('No convergence after 20 runs... aborting.')
-            exit()
 
     # Create the training set for the regression
     def create_training_set(self, lf_model, hf_model, id):
@@ -107,17 +69,11 @@ class BMFMC:
         regression_model = Regression(regression_type=self.regression_type,
                                       training_set_strategy=self.training_set_strategy)
 
-        x_train, self.adaptive = regression_model.create_training_set(lf_model=lf_model, hf_model=hf_model, id=id,
-                                                                      regression_models=self.regression_models)
+        x_train = regression_model.create_training_set(lf_model=lf_model, hf_model=hf_model, id=id,
+                                                       regression_models=self.regression_models)
 
         # Save regression model
-        if len(self.regression_models) == id:
-            self.regression_models.append(regression_model)
-        elif len(self.regression_models) == id + 1:
-            self.regression_models[id] = regression_model
-        else:
-            print('This is not supposed to happen. Something went very wrong.')
-            exit()
+        self.regression_models.append(regression_model)
 
         return x_train
 
@@ -345,8 +301,6 @@ class BMFMC:
         if mc and self.mc_model != 0:
             print('MC mean:\t\t\t\t\t\t%s' % self.mc_model.distribution.mean())
             print('MC std:\t\t\t\t\t\t\t%s' % self.mc_model.distribution.std())
-            # print('MC skew:\t\t\t\t\t\t%s' % self.mc_model.distribution.skew())
-            # print('MC kurt:\t\t\t\t\t\t%s' % self.mc_model.distribution.kurt())
             print('')
             print('MC-BMFMC KL:\t\t\t\t\t%f' % self.mc_model.distribution.calculate_kl_divergence(
                 self.models[-1].distribution))
@@ -366,8 +320,6 @@ class BMFMC:
             print('')
         print('High-fidelity mean:\t\t\t\t%s' % self.models[-1].distribution.mean())
         print('High-fidelity std:\t\t\t\t%s' % self.models[-1].distribution.std())
-        # print('High-fidelity skew:\t\t\t\t%s' % self.models[-1].distribution.skew())
-        # print('High-fidelity kurt:\t\t\t\t%s' % self.models[-1].distribution.kurt())
         print('')
         bmfmc_mean = self.calculate_bmfmc_expectation(fun=lambda x: x)
         bmfmc_mean_error = np.sqrt(self.calculate_bmfmc_mean_estimator_variance())
@@ -380,16 +332,6 @@ class BMFMC:
         bmfmc_std_error = np.sqrt(bmfmc_var + bmfmc_var_error) - bmfmc_std
         print('BMFMC std estimator abs err:\t%s' % bmfmc_std_error)
         print('BMFMC std estimator rel err:\t%s' % (bmfmc_std_error / bmfmc_std))
-        # bmfmc_skew = self.models[-1].distribution.skew()
-        # bmfmc_skew_error = np.sqrt(
-        #     self.calculate_bmfmc_expectation_estimator_variance(fun=lambda x: ((x - bmfmc_mean) / bmfmc_std) ** 3))
-        # print('BMFMC skew estimator abs err:\t%s' % bmfmc_skew_error)
-        # print('BMFMC skew estimator rel err:\t%s' % (bmfmc_skew_error / np.abs(bmfmc_skew)))
-        # bmfmc_kurt = self.models[-1].distribution.kurt()
-        # bmfmc_kurt_error = np.sqrt(
-        #     self.calculate_bmfmc_expectation_estimator_variance(fun=lambda x: ((x - bmfmc_mean) / bmfmc_std) ** 4))
-        # print('BMFMC kurt estimator abs err:\t%s' % bmfmc_kurt_error)
-        # print('BMFMC kurt estimator rel err:\t%s' % (bmfmc_kurt_error / bmfmc_kurt))
         print('')
         kl = self.models[-2].distribution.calculate_kl_divergence(self.models[-1].distribution)
         print('Relative information gain:\t\t%f' % kl)

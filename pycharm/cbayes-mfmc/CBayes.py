@@ -58,8 +58,7 @@ class CBayesPosterior:
         self.acc_rate = idx.size / r.shape[0]
 
         if self.acc_rate < 1.0e-2:
-            warnings.warn('Small acceptance rate: %f / %d accepted samples.' % (
-                self.acc_rate, idx.size))
+            warnings.warn('Small acceptance rate: %f / %d accepted samples.' % (self.acc_rate, idx.size))
 
         return self.p_prior.samples[idx], self.p_obs.samples[idx]
 

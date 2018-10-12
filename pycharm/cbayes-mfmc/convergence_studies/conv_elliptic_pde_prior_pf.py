@@ -3,13 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Model stuff
-import elliptic_pde_ml
+import elliptic_pde
 
 # Framework stuff
 from Distribution import Distribution
 from Model import Model
 from BMFMC import BMFMC
-from CBayes import CBayesPosterior
 
 # ------------------------------------------------- Config - General -------- #
 
@@ -54,7 +53,7 @@ if __name__ == '__main__':
 
     # Load data
     n_qoi = 1
-    prior_pf_samples = elliptic_pde_ml.load_data(h=40, n_models=3)
+    prior_pf_samples = elliptic_pde.load_data()
     prior_pf_samples_hf = prior_pf_samples[-1][:, 0:n_qoi]
     prior_pf_samples_mf = prior_pf_samples[1][:, 0:n_qoi] ** 1.1
     prior_pf_samples_lf = prior_pf_samples[0][:, 0:n_qoi] ** 1.2
@@ -95,13 +94,13 @@ if __name__ == '__main__':
 
         # Create a low-fidelity model
         lf_model = Model(
-            eval_fun=lambda x, samples=prior_pf_samples_lf: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
+            eval_fun=lambda x, samples=prior_pf_samples_lf: elliptic_pde.find_xy_pair(x, prior_samples, samples),
             rv_samples=prior_samples[:n_evals[0]], rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0],
             n_qoi=n_qoi, rv_name='$q_0$', label='Low-fidelity')
 
         # Create a high-fidelity model
         hf_model = Model(
-            eval_fun=lambda x, samples=prior_pf_samples_hf: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
+            eval_fun=lambda x, samples=prior_pf_samples_hf: elliptic_pde.find_xy_pair(x, prior_samples, samples),
             n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
         models = [lf_model, hf_model]
@@ -127,18 +126,18 @@ if __name__ == '__main__':
 
         # Create a low-fidelity model
         lf_model = Model(
-            eval_fun=lambda x, samples=prior_pf_samples_lf: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
+            eval_fun=lambda x, samples=prior_pf_samples_lf: elliptic_pde.find_xy_pair(x, prior_samples, samples),
             rv_samples=prior_samples[:n_evals[0]], rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0],
             n_qoi=n_qoi, rv_name='$q_0$', label='Low-fidelity')
 
         # Create a mid-fidelity model
         mf_model = Model(
-            eval_fun=lambda x, samples=prior_pf_samples_mf: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
+            eval_fun=lambda x, samples=prior_pf_samples_mf: elliptic_pde.find_xy_pair(x, prior_samples, samples),
             n_evals=n_evals[1], n_qoi=n_qoi, rv_name='$q_1$', label='Mid-fidelity')
 
         # Create a high-fidelity model
         hf_model = Model(
-            eval_fun=lambda x, samples=prior_pf_samples_hf: elliptic_pde_ml.find_xy_pair(x, prior_samples, samples),
+            eval_fun=lambda x, samples=prior_pf_samples_hf: elliptic_pde.find_xy_pair(x, prior_samples, samples),
             n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
         models = [lf_model, mf_model, hf_model]
@@ -164,6 +163,6 @@ if __name__ == '__main__':
     plt.ylabel('KL')
     plt.legend(loc='upper right')
     plt.grid(b=True)
-    plt.gcf().savefig('elliptic_pde_ml_1qoi_prior_pf_convergence.eps', dpi=300)
+    plt.gcf().savefig('elliptic_pde_1qoi_prior_pf_convergence.eps', dpi=300)
 
 # --------------------------------------------------------------------------- #

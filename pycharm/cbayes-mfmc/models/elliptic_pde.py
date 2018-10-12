@@ -17,9 +17,11 @@ import matplotlib.pyplot as plt
 # - Pressure values at (0.0540, 0.5487), (0.8726,0.8518) and (0.3748,0.0505)
 
 
-def load_data(h=40, n_models=3):
+def load_data():
     filepath = os.path.abspath(os.path.dirname(__file__))
     qvals = []
+    h = 40
+    n_models = 3
 
     for i in range(n_models):
         data_set = sio.loadmat(filepath + '/elliptic_kde100_50K_h%d_q.mat' % h)
@@ -38,8 +40,8 @@ def find_xy_pair(x, X, Y):
 # Exploring the data
 if __name__ == '__main__':
 
-    # Load data, h_min: 40, h_max: 160
-    qvals = load_data(h=40, n_models=3)
+    # Load data
+    qvals = load_data()
 
     n_samples = int(1e4)
 
