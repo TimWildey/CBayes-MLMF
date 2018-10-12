@@ -48,8 +48,8 @@ if __name__ == '__main__':
     n_evals_all.sort()
 
     costs_hf = 1.0
-    costs_mf = 0.1 * costs_hf
-    costs_lf = 0.1 * costs_mf
+    costs_mf = 0.25 * costs_hf
+    costs_lf = 0.25 * costs_mf
     total_costs_1lf = (costs_hf + costs_lf) * n_evals_bmfmc_hf + costs_lf * n_evals_bmfmc_lf
     total_costs_1lf = np.round(total_costs_1lf).astype(int)
     total_costs_2lf = (costs_hf + costs_mf) * n_evals_bmfmc_hf + (costs_mf + costs_lf) * n_evals_bmfmc_mf + costs_lf * n_evals_bmfmc_lf
@@ -167,6 +167,6 @@ if __name__ == '__main__':
     plt.ylabel('KL')
     plt.legend(loc='upper right')
     plt.grid(b=True)
-    plt.gcf().savefig('elliptic_pde_ml_3qoi_prior_pf_convergence.png', dpi=300)
+    plt.gcf().savefig('elliptic_pde_ml_3qoi_prior_pf_convergence.eps', dpi=300)
 
 # --------------------------------------------------------------------------- #

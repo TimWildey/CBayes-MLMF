@@ -274,7 +274,7 @@ class BMFMC:
 
         # Loop over all low-fidelity samples
         for i in range(n_lf):
-            if self.n_models > 2 and i % 50 == 0:
+            if self.n_models > 2 and i % 100 == 0:
                 print('\rCalculating errors... (%d / %d) ' % (i, n_lf), end='')
             elif self.n_models > 2 and i == n_lf - 1:
                 print('\r', end='')
@@ -422,13 +422,13 @@ class BMFMC:
                 exit()
 
             plt.grid(b=True)
-            plt.gcf().savefig('pngout/bmfmc_densities.png', dpi=300)
+            plt.gcf().savefig('output/bmfmc_densities.eps', dpi=300)
 
         else:
             # Seaborn pairplot of the high-fidelity push-forward
             utils.plot_multi_qoi(samples=self.models[-1].model_evals_pred)
             plt.grid(b=True)
-            plt.gcf().savefig('pngout/bmfmc_hf_pairplot.png', dpi=300)
+            plt.gcf().savefig('output/bmfmc_hf_pairplot.eps', dpi=300)
             plt.clf()
 
             # Plot marginals
@@ -477,7 +477,7 @@ class BMFMC:
                     exit()
 
                 plt.grid(b=True)
-                plt.gcf().savefig('pngout/bmfmc_densities_q%d.png' % (k + 1), dpi=300)
+                plt.gcf().savefig('output/bmfmc_densities_q%d.eps' % (k + 1), dpi=300)
                 plt.clf()
 
         if self.models[0].n_qoi == 2:
@@ -498,7 +498,7 @@ class BMFMC:
             plt.legend(loc='upper right')
             plt.grid(b=True)
 
-            plt.gcf().savefig('pngout/bmfmc_dists.png', dpi=300)
+            plt.gcf().savefig('output/bmfmc_dists.eps', dpi=300)
             xmin, xmax = plt.xlim()
             ymin, ymax = plt.ylim()
             plt.clf()
@@ -506,19 +506,19 @@ class BMFMC:
             self.models[0].distribution.plot_kde()
             plt.xlim([xmin, xmax])
             plt.ylim([ymin, ymax])
-            plt.gcf().savefig('pngout/bmfmc_lf.png', dpi=300)
+            plt.gcf().savefig('output/bmfmc_lf.eps', dpi=300)
             plt.clf()
 
             self.models[-1].distribution.plot_kde()
             plt.xlim([xmin, xmax])
             plt.ylim([ymin, ymax])
-            plt.gcf().savefig('pngout/bmfmc_hf.png', dpi=300)
+            plt.gcf().savefig('output/bmfmc_hf.eps', dpi=300)
 
             if mc and self.mc_model is not None:
                 self.mc_model.distribution.plot_kde()
                 plt.xlim([xmin, xmax])
                 plt.ylim([ymin, ymax])
-                plt.gcf().savefig('pngout/bmfmc_mc.png', dpi=300)
+                plt.gcf().savefig('output/bmfmc_mc.eps', dpi=300)
             elif mc and self.mc_model is None:
                 print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
                 exit()
@@ -571,7 +571,7 @@ class BMFMC:
                     utils.plot_1d_data(x_train[:, k], y_train[:, k], marker='*', linestyle='', markersize=5, color='k',
                                        label='Training data', xlabel=lf_model.rv_name, ylabel=hf_model.rv_name)
 
-                    plt.gcf().savefig('pngout/bmfmc_regression_model_' + str(i + 1) + '_q' + str(k + 1) + '.png',
+                    plt.gcf().savefig('output/bmfmc_regression_model_' + str(i + 1) + '_q' + str(k + 1) + '.eps',
                                       dpi=300)
                     plt.clf()
                 continue
@@ -615,9 +615,9 @@ class BMFMC:
 
             plt.grid(b=True)
             if self.n_models > 2:
-                plt.gcf().savefig('pngout/bmfmc_regression_model_' + str(i + 1) + '.png', dpi=300)
+                plt.gcf().savefig('output/bmfmc_regression_model_' + str(i + 1) + '.eps', dpi=300)
             else:
-                plt.gcf().savefig('pngout/bmfmc_regression_model.png', dpi=300)
+                plt.gcf().savefig('output/bmfmc_regression_model.eps', dpi=300)
 
             plt.clf()
 
@@ -635,9 +635,9 @@ class BMFMC:
 
                 plt.grid(b=True)
                 if self.n_models > 2:
-                    plt.gcf().savefig('pngout/bmfmc_joint_dist_' + str(i + 1) + '.png', dpi=300)
+                    plt.gcf().savefig('output/bmfmc_joint_dist_' + str(i + 1) + '.eps', dpi=300)
                 else:
-                    plt.gcf().savefig('pngout/bmfmc_joint_dist.png', dpi=300)
+                    plt.gcf().savefig('output/bmfmc_joint_dist.eps', dpi=300)
 
                 plt.clf()
 
@@ -655,9 +655,9 @@ class BMFMC:
 
                     plt.grid(b=True)
                     if self.n_models > 2:
-                        plt.gcf().savefig('pngout/bmfmc_joint_dist_' + str(i + 1) + '_q' + str(j + 1) + '.png', dpi=300)
+                        plt.gcf().savefig('output/bmfmc_joint_dist_' + str(i + 1) + '_q' + str(j + 1) + '.eps', dpi=300)
                     else:
-                        plt.gcf().savefig('pngout/bmfmc_joint_dist_q' + str(j + 1) + '.png', dpi=300)
+                        plt.gcf().savefig('output/bmfmc_joint_dist_q' + str(j + 1) + '.eps', dpi=300)
 
                     plt.clf()
 
