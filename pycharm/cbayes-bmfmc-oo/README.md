@@ -12,6 +12,9 @@
 ## Model.py
 * A data structure for models.
 
+## Regression.py
+* A data structure for regression model.
+
 ## utils.py
 * Plotting functionality.
 
@@ -21,8 +24,8 @@ Includes some model problems to generate samples from:
 * lambda_p.py: the polynomial lambda^p problem
 * ode_pp.py: a preditor-prey ODE model with 4 random variables
 
-## pngout/
-Figures are stored in here as PNGs.
+## output/
+Figures are stored in here as well as console output.
 
 ---
 

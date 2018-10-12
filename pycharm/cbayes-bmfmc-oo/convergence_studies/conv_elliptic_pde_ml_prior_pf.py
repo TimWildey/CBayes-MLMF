@@ -164,6 +164,6 @@ if __name__ == '__main__':
     plt.ylabel('KL')
     plt.legend(loc='upper right')
     plt.grid(b=True)
-    plt.gcf().savefig('elliptic_pde_ml_1qoi_prior_pf_convergence.png', dpi=300)
+    plt.gcf().savefig('elliptic_pde_ml_1qoi_prior_pf_convergence.eps', dpi=300)
 
 # --------------------------------------------------------------------------- #

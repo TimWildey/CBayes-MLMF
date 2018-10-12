@@ -35,7 +35,7 @@ np.random.seed(42)
 #   - elliptic_pde_ml_fixed / elliptic_pde_ml_fixed_2d / elliptic_pde_ml_fixed_3d
 #   - ode_pp /  ode_pp_2d
 
-model = 'elliptic_pde_ml_2d'
+model = 'lambda_p'
 
 # Push-forward methods (weird name...):
 #   - mc
@@ -52,19 +52,19 @@ pf_method = 'bmfmc'
 #   - ode_pp supports arbitrary many
 #   - elliptic_pde_ml / elliptic_pde_ml_fixed support five
 
-n_evals = [10000, 1000, 100]
+n_evals = [20000, 50, 25]
 n_models = len(n_evals)
 
 # Number of samples for the Monte Carlo reference
 
-n_mc_ref = int(5e4)
+n_mc_ref = int(2e4)
 
 # Training set selection strategies:
 #   - support_covering / support_covering_adaptive
 #   - sampling / sampling_adaptive
 #   - fixed
 
-training_set_strategy = 'sampling'
+training_set_strategy = 'support_covering'
 
 # Regression model types
 #   - gaussian_process
@@ -75,7 +75,7 @@ training_set_strategy = 'sampling'
 #   - shared_heteroscedastic_gaussian_process
 #   - EXPERIMENTAL: pymc_gp
 
-regression_type = 'heteroscedastic_gaussian_process'
+regression_type = 'gaussian_process'
 
 
 # ---------------------------------------------------------- Todos ---------- #
@@ -234,18 +234,18 @@ def get_prior_prior_pf_samples():
         # Setup and load data
         if model == 'elliptic_pde_ml':
             n_qoi = 1
-            obs_loc = [0.74]
-            obs_scale = [0.01]
+            obs_loc = [0.71]
+            obs_scale = [0.02]
 
         elif model == 'elliptic_pde_ml_2d':
             n_qoi = 2
-            obs_loc = [0.74, 0.09]
-            obs_scale = [0.01, 0.01]
+            obs_loc = [0.71, 0.12]
+            obs_scale = [0.02, 0.02]
 
         elif model == 'elliptic_pde_ml_3d':
             n_qoi = 3
-            obs_loc = [0.74, 0.09, 0.46]
-            obs_scale = [0.01, 0.01, 0.01]
+            obs_loc = [0.71, 0.12, 0.45]
+            obs_scale = [0.02, 0.02, 0.02]
 
         h = 160 / 2 ** (n_models - 1)
         prior_pf_samples = elliptic_pde_ml.load_data(h=h, n_models=n_models)
@@ -544,20 +544,10 @@ def get_prior_prior_pf_samples():
         # Diagnostics
         bmfmc.print_stats(mc=True)
 
-        # TEST
+        # Calculate CDF + error bars
 
-        # # Densities
-        # print(bmfmc.calculate_bmfmc_density_expectation(val=0.7))
-
-        # # Probabilities
-        # fun = lambda x: (x > 0.1) & (x < 0.3)
-        # print(bmfmc.calculate_bmfmc_expectation(fun=fun))
-        # print(bmfmc.calculate_bmfmc_expectation_estimator_variance(fun=fun))
-        # exit()
-
-        # n_vals = 20
-        # cdf_mean, y_range = bmfmc.calculate_bmfmc_cdf(n_vals=n_vals)
-        # cdf_var, _ = bmfmc.calculate_bmfmc_cdf_estimator_variance(n_vals=n_vals)
+        # cdf_mean, y_range = bmfmc.calculate_bmfmc_cdf()
+        # cdf_var, _ = bmfmc.calculate_bmfmc_cdf_estimator_variance()
         # cdf_std = np.sqrt(cdf_var)
         #
         # plt.figure()
@@ -568,10 +558,8 @@ def get_prior_prior_pf_samples():
         # plt.xlabel('$Q$')
         # plt.ylabel('Pr$[Q]$')
         # plt.title('CDF')
-        # plt.gcf().savefig('pngout/bmfmc_cdf.png', dpi=300)
+        # plt.gcf().savefig('output/bmfmc_cdf.eps', dpi=300)
         # exit()
-
-        # TEST
 
         bmfmc.plot_results(mc=True)
         bmfmc.plot_regression_models()
@@ -699,7 +687,7 @@ if __name__ == '__main__':
         plt.legend(loc='lower right')
         plt.ylabel('KL')
         plt.xticks([])
-        plt.gcf().savefig('pngout/cbayes_prior_post_kls.png', dpi=300)
+        plt.gcf().savefig('output/cbayes_prior_post_kls.eps', dpi=300)
 
         # Plot Prior-PF KLs
         plt.figure()
@@ -719,7 +707,7 @@ if __name__ == '__main__':
         plt.legend(loc='upper right')
         plt.ylabel('KL')
         plt.xticks([])
-        plt.gcf().savefig('pngout/bmfmc_prior_pf_kls.png', dpi=300)
+        plt.gcf().savefig('output/bmfmc_prior_pf_kls.eps', dpi=300)
 
     # Output directory name
     outdirname = model + '_' + training_set_strategy + '_' + regression_type + '_' + str(n_mc_ref)
@@ -727,15 +715,15 @@ if __name__ == '__main__':
         outdirname += '_' + str(n_evals[i])
 
     # Clean output folder
-    if os.path.isdir('pngout/' + outdirname):
-        os.system('rm -rf pngout/' + outdirname)
-        os.mkdir('pngout/' + outdirname)
+    if os.path.isdir('output/' + outdirname):
+        os.system('rm -rf output/' + outdirname)
+        os.mkdir('output/' + outdirname)
     else:
-        os.mkdir('pngout/' + outdirname)
+        os.mkdir('output/' + outdirname)
 
     # Move pngs into output folder
-    os.system('mv pngout/*.png pngout/' + outdirname + '/')
-    os.system('mv pngout/output.txt pngout/' + outdirname + '/')
+    os.system('mv output/*.eps output/' + outdirname + '/')
+    os.system('mv output/output.txt output/' + outdirname + '/')
 
     end = time.time()
     print('(Total elapsed time: %fs)' % (end - start))

@@ -143,15 +143,15 @@ class CBayesPosterior:
             return
 
         plt.grid(b=True)
-        plt.gcf().savefig('pngout/cbayes_dists_%s.png' % model_tag, dpi=300)
+        plt.gcf().savefig('output/cbayes_dists_%s.eps' % model_tag, dpi=300)
 
         # Plot some bivariate distributions
         if self.p_obs.n_dim == 2 and model_tag == 'hf':
             self.p_obs.plot_kde()
             plt.grid(b=True)
-            plt.gcf().savefig('pngout/cbayes_dists_obs.png', dpi=300)
+            plt.gcf().savefig('output/cbayes_dists_obs.eps', dpi=300)
             plt.clf()
-            plt.gcf().savefig('pngout/cbayes_dists_hf_post_pf.png', dpi=300)
+            plt.gcf().savefig('output/cbayes_dists_hf_post_pf.eps', dpi=300)
 
         plt.clf()
 
@@ -166,4 +166,4 @@ class CBayesPosterior:
             self.p_post.plot_kde(fignum=fignum, color=color, linestyle=linestyle, label=label, xmin=xmin, xmax=xmax)
             if save_fig:
                 plt.grid(b=True)
-                plt.gcf().savefig('pngout/cbayes_post_densities.png', dpi=300)
+                plt.gcf().savefig('output/cbayes_post_densities.eps', dpi=300)

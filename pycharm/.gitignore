@@ -1,11 +1,7 @@
 .DS_Store
 /cbayes-bmfmc-oo/__pycache__/
 /cbayes-bmfmc-oo/models/__pycache__/
-/cbayes-bmfmc-oo/pngout/*
-/cbayes-bmfmc-oo/convergence_studies/*.png
-/test_scripts/pngout/*
-/test_scripts/texout/*
-/test_scripts/bmfmc/__pycache__/
-/test_scripts/models/__pycache__/
-/test_scripts/cbayes/__pycache__/
+/cbayes-bmfmc-oo/output/*
+/cbayes-bmfmc-oo/convergence_studies/paper/*
+/cbayes-bmfmc-oo/convergence_studies/*.eps
 /.idea/

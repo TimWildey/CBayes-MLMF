@@ -1,10 +1,7 @@
 # Pycharm project folder
 
-### test_scripts
-* Several test scripts for prototyping
-
 ### cbayes-bmfmc-oo
-* A more flexible, object-oriented code to work with
+* A flexible, object-oriented code to work with
 
 ---
 
