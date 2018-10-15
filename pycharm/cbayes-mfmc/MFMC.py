@@ -29,17 +29,17 @@ class MFMC:
         self.regression_models = []
 
     # Main method in mfmc: evaluate, regress, predict
-    def apply_mfmc_framework(self):
+    def apply_mfmc_framework(self, verbose=True):
 
         for i in range(self.n_models - 1):
 
             lf_model = self.models[i]
             hf_model = self.models[i + 1]
 
-            if self.n_models == 2:
+            if self.n_models == 2 and verbose:
                 print('')
                 print('Training the conditional model ...')
-            else:
+            elif verbose:
                 print('')
                 print('Training conditional model %d / %d ...' % (i + 1, self.n_models - 1))
 

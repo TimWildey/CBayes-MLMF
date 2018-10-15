@@ -92,8 +92,7 @@ def plot_multi_qoi(samples, num=1, cmap='Blues', title=''):
 
     g = sns.PairGrid(df)
     g = g.map_upper(plt.scatter, color='k', alpha=0.3, s=1, linewidth=0.0, marker='o')
-    # g = g.map_lower(sns.kdeplot, shade=True, shade_lowest=False, cmap='Blues')
-    g = g.map_lower(sns.kdeplot)
+    g = g.map_lower(sns.kdeplot, shade=True, shade_lowest=False, cmap='Blues_d')
     g = g.map_diag(sns.kdeplot, lw=2, legend=False, color='C0')
 
 
