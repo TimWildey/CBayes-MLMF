@@ -15,7 +15,7 @@ from MFMC import MFMC
 np.random.seed(42)
 
 # Number of lowest-fidelity samples (1e4 should be fine for 1 QoI)
-n_mc_ref = int(1e4)
+n_mc_ref = int(2e4)
 
 # ----------------------------------------------------Config - MFMC -------- #
 
@@ -29,12 +29,13 @@ regression_type = 'gaussian_process'
 
 if __name__ == '__main__':
 
-    n_fac_mf = 2
-    n_fac_lf = 100
+    n_avg = 100
 
-    n_evals_mc = np.logspace(np.log10(5), np.log10(1000), 15)
+    n_fac_mf = 2
+    n_grid = 10
+    n_evals_mc = np.logspace(np.log10(5), np.log10(1000), n_grid)
     n_evals_mc = np.round(n_evals_mc).astype(int)
-    n_evals_mfmc_hf = np.logspace(np.log10(5), np.log10(200), 10)
+    n_evals_mfmc_hf = np.logspace(np.log10(5), np.log10(200), n_grid)
     n_evals_mfmc_hf = np.round(n_evals_mfmc_hf).astype(int)
     n_evals_mfmc_mf = n_fac_mf * n_evals_mfmc_hf
     n_evals_mfmc_lf = [n_mc_ref] * 10
@@ -54,7 +55,7 @@ if __name__ == '__main__':
     prior_samples = lambda_p.get_prior_samples(n_mc_ref)
 
     # Create the MC reference model
-    print('\nCalculating MC reference ...')
+    # print('\nCalculating MC reference ...')
     p_hf = 5
     p_mf = 3
     p_lf = 1
@@ -70,90 +71,100 @@ if __name__ == '__main__':
     # Prior push-forward
     ref_p_prior_pf = Distribution(ref_prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-    # -------------- 1 HF
+    kls_prior_pf_1hf_avg = np.zeros((n_grid,))
+    kls_prior_pf_1hf_1lf_avg = np.zeros((n_grid,))
+    kls_prior_pf_1hf_2lf_avg = np.zeros((n_grid,))
+    for k in range(n_avg):
+        print('\nRun %d / %d' % (k + 1, n_avg))
 
-    kls_prior_pf_1hf = []
-    for idx, n_evals in enumerate(n_evals_mc):
-        print('\nCalculating MC model %d / %d ...' % (idx + 1, len(n_evals_mc)))
-        model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), rv_samples=prior_samples[0:n_evals, :],
-                      n_evals=n_evals, n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
+        # -------------- 1 HF
 
-        # Brute force Monte Carlo
-        prior_pf_samples = model.evaluate()
-        p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
+        kls_prior_pf_1hf = []
+        for idx, n_evals in enumerate(n_evals_mc):
+            # print('\nCalculating MC model %d / %d ...' % (idx + 1, len(n_evals_mc)))
+            model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), rv_samples=prior_samples[0:n_evals, :],
+                          n_evals=n_evals, n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
-        # kl between prior push-forward and reference push-forward
-        kls_prior_pf_1hf.append(ref_p_prior_pf.calculate_kl_divergence(p_prior_pf))
+            # Brute force Monte Carlo
+            prior_pf_samples = model.evaluate()
+            p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-    # -------------- 1 HF, 1 LF
+            # kl between prior push-forward and reference push-forward
+            kls_prior_pf_1hf.append(ref_p_prior_pf.calculate_kl_divergence(p_prior_pf))
 
-    kls_prior_pf_1hf_1lf = []
-    for idx, n_evals in enumerate(n_evals_mfmc_hf):
-        print('\nCalculating MFMC model %d / %d ...' % (idx + 1, len(n_evals_mfmc_hf)))
-        n_evals = [n_evals_mfmc_lf[idx], n_evals]
+        # -------------- 1 HF, 1 LF
 
-        # Create a low-fidelity model
-        lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_lf), rv_samples=prior_samples[:n_evals[0]],
-                         rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0], n_qoi=n_qoi,
-                         rv_name='$q_0$', label='Low-fidelity')
+        kls_prior_pf_1hf_1lf = []
+        for idx, n_evals in enumerate(n_evals_mfmc_hf):
+            # print('\nCalculating MFMC model %d / %d ...' % (idx + 1, len(n_evals_mfmc_hf)))
+            n_evals = [n_evals_mfmc_lf[idx], n_evals]
 
-        # Create a high-fidelity model
-        hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), n_evals=n_evals[-1],
-                         n_qoi=n_qoi,
-                         rv_name='$Q$', label='High-fidelity')
+            # Create a low-fidelity model
+            lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_lf), rv_samples=prior_samples[:n_evals[0]],
+                             rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0], n_qoi=n_qoi,
+                             rv_name='$q_0$', label='Low-fidelity')
 
-        models = [lf_model, hf_model]
+            # Create a high-fidelity model
+            hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), n_evals=n_evals[-1],
+                             n_qoi=n_qoi,
+                             rv_name='$Q$', label='High-fidelity')
 
-        # Setup MFMC
-        mfmc = MFMC(models=models,
-                     training_set_strategy=training_set_strategy, regression_type=regression_type)
+            models = [lf_model, hf_model]
 
-        # Apply MFMC
-        mfmc.apply_mfmc_framework()
-        prior_pf_samples = mfmc.get_samples()[-1, :, :]
-        p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
+            # Setup MFMC
+            mfmc = MFMC(models=models,
+                         training_set_strategy=training_set_strategy, regression_type=regression_type)
 
-        # kl between prior push-forward and reference push-forward
-        kls_prior_pf_1hf_1lf.append(ref_p_prior_pf.calculate_kl_divergence(p_prior_pf))
+            # Apply MFMC
+            mfmc.apply_mfmc_framework(verbose=False)
+            prior_pf_samples = mfmc.get_samples()[-1, :, :]
+            p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-    # -------------- 1 HF, 2 LF
+            # kl between prior push-forward and reference push-forward
+            kls_prior_pf_1hf_1lf.append(ref_p_prior_pf.calculate_kl_divergence(p_prior_pf))
 
-    kls_prior_pf_1hf_2lf = []
-    for idx, n_evals in enumerate(n_evals_mfmc_hf):
-        n_evals = [n_evals_mfmc_lf[idx], n_evals_mfmc_mf[idx], n_evals]
-        print('\nCalculating MFMC multi-model %d / %d ...' % (idx + 1, len(n_evals_mfmc_hf)))
+        # -------------- 1 HF, 2 LF
 
-        # Create a low-fidelity model
-        lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_lf), rv_samples=prior_samples[:n_evals[0]],
-                         rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0], n_qoi=n_qoi,
-                         rv_name='$q_0$', label='Low-fidelity')
+        kls_prior_pf_1hf_2lf = []
+        for idx, n_evals in enumerate(n_evals_mfmc_hf):
+            n_evals = [n_evals_mfmc_lf[idx], n_evals_mfmc_mf[idx], n_evals]
+            # print('\nCalculating MFMC multi-model %d / %d ...' % (idx + 1, len(n_evals_mfmc_hf)))
 
-        # Create a mid-fidelity model
-        mf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_mf), n_evals=n_evals[1],
-                         n_qoi=n_qoi, rv_name='$q_1$', label='Mid-fidelity')
+            # Create a low-fidelity model
+            lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_lf), rv_samples=prior_samples[:n_evals[0]],
+                             rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0], n_qoi=n_qoi,
+                             rv_name='$q_0$', label='Low-fidelity')
 
-        # Create a high-fidelity model
-        hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), n_evals=n_evals[-1],
-                         n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
+            # Create a mid-fidelity model
+            mf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_mf), n_evals=n_evals[1],
+                             n_qoi=n_qoi, rv_name='$q_1$', label='Mid-fidelity')
 
-        models = [lf_model, mf_model, hf_model]
+            # Create a high-fidelity model
+            hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, p_hf), n_evals=n_evals[-1],
+                             n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
 
-        # Setup MFMC
-        mfmc = MFMC(models=models,
-                     training_set_strategy=training_set_strategy, regression_type=regression_type)
+            models = [lf_model, mf_model, hf_model]
 
-        # Apply MFMC
-        mfmc.apply_mfmc_framework()
-        prior_pf_samples = mfmc.get_samples()[-1, :, :]
-        p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
+            # Setup MFMC
+            mfmc = MFMC(models=models,
+                         training_set_strategy=training_set_strategy, regression_type=regression_type)
 
-        # kl between prior push-forward and reference push-forward
-        kls_prior_pf_1hf_2lf.append(ref_p_prior_pf.calculate_kl_divergence(p_prior_pf))
+            # Apply MFMC
+            mfmc.apply_mfmc_framework(verbose=False)
+            prior_pf_samples = mfmc.get_samples()[-1, :, :]
+            p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
+
+            # kl between prior push-forward and reference push-forward
+            kls_prior_pf_1hf_2lf.append(ref_p_prior_pf.calculate_kl_divergence(p_prior_pf))
+
+        kls_prior_pf_1hf_avg += 1 / n_avg * np.asarray(kls_prior_pf_1hf)
+        kls_prior_pf_1hf_1lf_avg += 1 / n_avg * np.asarray(kls_prior_pf_1hf_1lf)
+        kls_prior_pf_1hf_2lf_avg += 1 / n_avg * np.asarray(kls_prior_pf_1hf_2lf)
 
     plt.figure()
-    plt.semilogx(np.squeeze(n_evals_mc), kls_prior_pf_1hf, '-o', label='1 HF')
-    plt.semilogx(np.squeeze(total_costs_1lf), kls_prior_pf_1hf_1lf, '-o', label='1 HF, 1 LF')
-    plt.semilogx(np.squeeze(total_costs_2lf), kls_prior_pf_1hf_2lf, '-o', label='1 HF, 1 MF, 1 LF')
+    plt.semilogx(np.squeeze(n_evals_mc), kls_prior_pf_1hf_avg, '-o', label='1 HF')
+    plt.semilogx(np.squeeze(total_costs_1lf), kls_prior_pf_1hf_1lf_avg, '-o', label='1 HF, 1 LF')
+    plt.semilogx(np.squeeze(total_costs_2lf), kls_prior_pf_1hf_2lf_avg, '-o', label='1 HF, 1 MF, 1 LF')
     plt.semilogx(np.squeeze(n_evals_all), np.zeros((len(n_evals_all))), 'k--')
     plt.xlabel('No. HF samples')
     plt.ylabel('KL')
