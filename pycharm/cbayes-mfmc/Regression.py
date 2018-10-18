@@ -209,7 +209,9 @@ class Regression:
 
                     idx = (np.linalg.norm(mu - x_train_linspace[i, :], axis=1, ord=1)).argmin()
 
-                    # There are 3 ways to choose x_train (the first seems to be the most accurate one):
+                    # There are 3 ways to choose x_train. It seems to pay off to invest in additional evaluations in 1),
+                    # using 2) and 3) will most likely increase the variance in the correlations:
+
                     # 1) Evaluating the low-fidelity
                     x_train[i, :] = lf_model.eval_fun(lf_model.rv_samples_pred[idx, :])
 
@@ -235,7 +237,9 @@ class Regression:
                 x_train = lf_model.model_evals_pred[indices, :]
 
             else:
-                # There are 3 ways to choose x_train (the first seems to be the most accurate one):
+                # There are 3 ways to choose x_train. It seems to pay off to invest in additional evaluations in 1),
+                # using 2) and 3) will most likely increase the variance in the correlations:
+
                 # 1) Evaluating the low-fidelity
                 x_train = np.zeros((hf_model.n_evals, lf_model.n_qoi))
                 for i in range(hf_model.n_evals):
