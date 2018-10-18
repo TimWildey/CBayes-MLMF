@@ -14,23 +14,25 @@ from MFMC import MFMC
 
 np.random.seed(42)
 
-# Number of lowest-fidelity samples (1e4 should be fine for 1 QoI)
+# Number of samples for the Monte Carlo reference
 n_mc_ref = int(2e4)
 
 # ----------------------------------------------------Config - MFMC -------- #
 
-# Training set selection strategy (support_covering, support_covering_adaptive, sampling, sampling_adaptive)
+# Training set selection strategy
 training_set_strategy = 'support_covering'
 
-# Regression model type (gaussian_process, heteroscedastic_gaussian_process)
+# Regression model type
 regression_type = 'gaussian_process'
 
 # ------------------------------------------------------------- Main -------- #
 
 if __name__ == '__main__':
 
+    # No. of averaging runs
     n_avg = 100
 
+    # Evaluations
     n_fac_mf = 2
     n_grid = 10
     n_evals_mc = np.logspace(np.log10(5), np.log10(1000), n_grid)
@@ -42,12 +44,13 @@ if __name__ == '__main__':
     n_evals_all = n_evals_mc.tolist() + list(set(n_evals_mfmc_hf.tolist()) - set(n_evals_mc.tolist()))
     n_evals_all.sort()
 
+    # Costs
     costs_hf = n_evals_mfmc_hf
     costs_mf = 0.0 * costs_hf
     costs_lf = 0.0 * costs_mf
-    total_costs_1lf = costs_hf + costs_lf
+    total_costs_1lf = costs_hf * n_evals_mfmc_hf + costs_lf * n_evals_mfmc_lf
     total_costs_1lf = np.round(total_costs_1lf).astype(int)
-    total_costs_2lf = costs_hf + costs_mf + costs_lf
+    total_costs_2lf = (costs_hf + costs_mf) * n_evals_mfmc_hf + costs_mf * n_evals_mfmc_mf + costs_lf * n_evals_mfmc_lf
     total_costs_2lf = np.round(total_costs_2lf).astype(int)
 
     # lambda_p model
@@ -55,7 +58,6 @@ if __name__ == '__main__':
     prior_samples = lambda_p.get_prior_samples(n_mc_ref)
 
     # Create the MC reference model
-    # print('\nCalculating MC reference ...')
     p_hf = 5
     p_mf = 3
     p_lf = 1

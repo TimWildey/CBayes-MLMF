@@ -118,7 +118,8 @@ class Regression:
                 # See here for more info: https://github.com/jmetzen/gp_extras/
                 prototypes = KMeans(n_clusters=5).fit(np.expand_dims(self.x_pred[:, i], axis=1)).cluster_centers_
                 kernel = ConstantKernel() + ConstantKernel() * RBF() \
-                    + HeteroscedasticKernel.construct(prototypes, 1e-3, (1e-10, 5e1), gamma=5.0, gamma_bounds="fixed")
+                         + HeteroscedasticKernel.construct(prototypes, 1e-3, (1e-10, 5e1), gamma=5.0,
+                                                           gamma_bounds="fixed")
                 self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6))
                 self.regression_model[i].fit(np.expand_dims(self.x_train[:, i], axis=1), self.y_train[:, i])
 
@@ -202,7 +203,6 @@ class Regression:
                     x_train[i, :] = lf_model.model_evals_pred[idx, :]
 
                 # For any other regression model, finding the correct x,y pair is a noisy task.
-                # We use the mean predictions of the GP to do that.
                 else:
                     regression_model = regression_models[id - 1]
                     mu = regression_model.mu
@@ -210,7 +210,6 @@ class Regression:
                     idx = (np.linalg.norm(mu - x_train_linspace[i, :], axis=1, ord=1)).argmin()
 
                     # There are 3 ways to choose x_train (the first seems to be the most accurate one):
-
                     # 1) Evaluating the low-fidelity
                     x_train[i, :] = lf_model.eval_fun(lf_model.rv_samples_pred[idx, :])
 

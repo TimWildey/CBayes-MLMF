@@ -1,4 +1,6 @@
-# Standard stuff
+# ------------------------------------------------- Imports ----------------- #
+
+# Standard imports
 import numpy as np
 import os
 import sys
@@ -9,11 +11,11 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/models')
 
-# Model stuff
+# Models imports
 import lambda_p
 import elliptic_pde
 
-# Framework stuff
+# Framework imports
 from Distribution import Distribution
 from Model import Model
 from MFMC import MFMC
@@ -31,7 +33,7 @@ np.random.seed(42)
 #   - elliptic_pde_2d
 #   - elliptic_pde_3d
 
-model = 'elliptic_pde_3d'
+model = 'lambda_p'
 
 # Forward UQ method:
 #   - mc
@@ -41,21 +43,20 @@ fw_uq_method = 'mfmc'
 
 # ----------------------------------------------------Config - MFMC -------- #
 
-
 # Number of model evaluations in increasing fidelity starting with the lowest fidelity
 
-n_evals = [10000, 1000, 100]
+n_evals = [20000, 50, 25]
 n_models = len(n_evals)
 
 # Number of samples for the Monte Carlo reference
 
-n_mc_ref = int(5e4)
+n_mc_ref = int(2e4)
 
 # Training set selection strategies:
 #   - support_covering
 #   - sampling
 
-training_set_strategy = 'sampling'
+training_set_strategy = 'support_covering'
 
 # Regression model types
 #   - gaussian_process
@@ -63,8 +64,7 @@ training_set_strategy = 'sampling'
 #   - decoupled_gaussian_process
 #   - decoupled_heteroscedastic_gaussian_process
 
-regression_type = 'heteroscedastic_gaussian_process'
-
+regression_type = 'gaussian_process'
 
 # ------------------------------------------------- Models & Methods -------- #
 
@@ -229,7 +229,6 @@ def get_prior_prior_pf_samples():
 
     return prior_samples, prior_pf_samples, obs_loc, obs_scale, prior_pf_mc_samples
 
-
 # ------------------------------------------------------------- Main -------- #
 
 
@@ -305,12 +304,13 @@ if __name__ == '__main__':
             cbayes_post_lf.setup_posterior_and_pf()
             cbayes_post_lf.print_stats()
 
-            if i == 0:
-                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Low-fidelity')
-            elif i == 1:
-                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Mid-fidelity')
-            else:
-                cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Mid-%d-fidelity' % (i + 1))
+            if model is 'lambda_p':
+                if i == 0:
+                    cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Low-fidelity')
+                elif i == 1:
+                    cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Mid-fidelity')
+                else:
+                    cbayes_post_lf.plot_posterior(fignum=5, color='C%d' % i, label='Mid-%d-fidelity' % (i + 1))
 
             kls[i] = cbayes_post_lf.get_prior_post_kl()
             pf_kls[i] = cbayes_post_mc.p_prior_pf.calculate_kl_divergence(cbayes_post_lf.p_prior_pf)
@@ -318,8 +318,9 @@ if __name__ == '__main__':
                 cbayes_post_lf.plot_results(model_tag='lf')
 
         # Plot high-fidelity and MC posterior densities
-        cbayes_post.plot_posterior(fignum=5, color='C%d' % (n_models - 1), label='High-fidelity')
-        cbayes_post_mc.plot_posterior(fignum=5, color='k', linestyle='--', label='MC reference', save_fig=True)
+        if model is 'lambda_p':
+            cbayes_post.plot_posterior(fignum=5, color='C%d' % (n_models - 1), label='High-fidelity')
+            cbayes_post_mc.plot_posterior(fignum=5, color='k', linestyle='--', label='MC reference', save_fig=True)
 
         end = time.time()
         print('(Low-fidelities CBayes elapsed time: %fs)\n' % (end - lap))
