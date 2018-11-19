@@ -257,6 +257,18 @@ class Regression:
             hf_rv_samples = lf_model.rv_samples_pred[indices, :]
             hf_model.set_rv_samples(hf_rv_samples)
 
+        elif self.training_set_strategy is 'fixed':
+
+            # We just choose the first low-fidelity samples
+            indices = range(hf_model.n_evals)
+
+            # Get the corresponding lower-fidelity evaluations
+            x_train = lf_model.model_evals_pred[indices]
+
+            # Assign model evaluation points to the high-fidelity model
+            hf_rv_samples = lf_model.rv_samples_pred[indices]
+            hf_model.set_rv_samples(hf_rv_samples)
+
         else:
             print('Unknown training set selection strategy.')
             exit()
