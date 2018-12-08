@@ -71,12 +71,12 @@ class CBayesPosterior:
         # Create a posterior distribution
         self.p_post = Distribution(samples=post_samples, rv_name=self.p_prior.rv_name,
                                    rv_transform=self.p_prior.rv_transform,
-                                   label='Posterior', kde=False)
+                                   label='Updated', kde=False)
 
         # Create the posterior push-forward distribution
         self.p_post_pf = Distribution(samples=post_pf_samples, rv_name=self.p_obs.rv_name,
                                       rv_transform=self.p_obs.rv_transform,
-                                      label='Posterior-PF')
+                                      label='PF Updated')
 
     # Get the KL between prior and posterior
     def get_prior_post_kl(self):
@@ -130,11 +130,11 @@ class CBayesPosterior:
 
         elif self.p_obs.n_dim == 2:
             sns.kdeplot(self.p_prior_pf.samples[:, 0], self.p_prior_pf.samples[:, 1], shade=True, shade_lowest=False,
-                        cmap='Blues', label='Prior PF', color='C0')
+                        cmap='Blues', label='PF-initial', color='C0')
             sns.kdeplot(self.p_obs.samples[:, 0], self.p_obs.samples[:, 1], shade=True, shade_lowest=False, cmap='Reds',
                         label='Observed density', color='C3')
             sns.kdeplot(self.p_post_pf.samples[:, 0], self.p_post_pf.samples[:, 1], cmap='Greys', alpha=1.0,
-                        label='Posterior PF', color='Black')
+                        label='PF-updated', color='Black')
             plt.legend(loc='upper right')
             plt.xlabel('$Q_1$')
             plt.ylabel('$Q_2$')
@@ -142,15 +142,15 @@ class CBayesPosterior:
             return
 
         plt.grid(b=True)
-        plt.gcf().savefig('output/cbayes_dists_%s.eps' % model_tag, dpi=300)
+        plt.gcf().savefig('output/cbayes_dists_%s.pdf' % model_tag, dpi=300)
 
         # Plot some bivariate distributions
         if self.p_obs.n_dim == 2 and model_tag == 'hf':
             self.p_obs.plot_kde()
             plt.grid(b=True)
-            plt.gcf().savefig('output/cbayes_dists_obs.eps', dpi=300)
+            plt.gcf().savefig('output/cbayes_dists_obs.pdf', dpi=300)
             plt.clf()
-            plt.gcf().savefig('output/cbayes_dists_hf_post_pf.eps', dpi=300)
+            plt.gcf().savefig('output/cbayes_dists_hf_post_pf.pdf', dpi=300)
 
         plt.clf()
 
@@ -165,4 +165,19 @@ class CBayesPosterior:
             self.p_post.plot_kde(fignum=fignum, color=color, linestyle=linestyle, label=label, xmin=xmin, xmax=xmax)
             if save_fig:
                 plt.grid(b=True)
-                plt.gcf().savefig('output/cbayes_post_densities.eps', dpi=300)
+                plt.gcf().savefig('output/cbayes_post_densities.pdf', dpi=300)
+        elif self.p_post.n_dim == 2:
+            #self.p_post.create_kernel_density()
+            #xmin = np.min(self.p_prior.samples, axis=0)
+            #xmax = np.max(self.p_prior.samples, axis=0)
+            self.p_post.plot_kde(fignum=fignum, color=color, linestyle=linestyle, label=label)
+            #if save_fig:
+            xmin = np.min(self.p_prior.samples[:,0], axis=0)
+            xmax = np.max(self.p_prior.samples[:,0], axis=0)
+            ymin = np.min(self.p_prior.samples[:,1], axis=0)
+            ymax = np.max(self.p_prior.samples[:,1], axis=0)
+            plt.xlim([xmin, xmax])
+            plt.ylim([ymin, ymax])
+            plt.grid(b=True)
+            plt.gcf().savefig('output/cbayes_post_densities.pdf', dpi=300)
+            plt.clf()

@@ -20,18 +20,21 @@ def load_data():
     # hf_data = np.loadtxt(filepath + '/sample_data_f_100.dat')
     hf_data = np.loadtxt(filepath + '/sample_data_f_100_ce.dat')
 
-    return lf_data*1000, hf_data*1000
+    lf_samples = np.loadtxt(filepath + '/sample_points_c_10K.dat')
+    
+    return 1000*lf_data, 1000*hf_data, lf_samples
 
 
 # Exploring the data
 if __name__ == '__main__':
 
     # Load data
-    lf, hf = load_data()
+    lf, hf, sp = load_data()
 
     plt.figure()
     plt.plot(lf[:100], hf, 'k*')
     plt.show()
 
+
     print('LF-HF correlations: %f' % np.corrcoef(lf[:100], hf)[0, 1])
-    exit()
+    #exit()

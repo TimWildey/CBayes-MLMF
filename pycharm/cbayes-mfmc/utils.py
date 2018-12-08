@@ -59,10 +59,12 @@ def plot_2d_kde(samples, xlabel='$Q_1$', ylabel='$Q_2$', num=1, cmap='Blues', ti
     df = pd.DataFrame(samples, columns=[xlabel, ylabel])
     g = sns.jointplot(x=xlabel, y=ylabel, data=df, kind='kde', color='C0', shade=True, shade_lowest=True, cmap=cmap,
                       label='Density')
-    g.plot_joint(plt.scatter, c='k', alpha=0.3, s=1, linewidth=0.0, marker='o', label='Samples')
+    g.plot_joint(plt.scatter, c='k', alpha=0.3, s=20, linewidth=0.0, marker='o', label='Samples')
     g.ax_joint.collections[0].set_alpha(0)
+    g.ax_joint.legend_.remove()
     g.set_axis_labels(xlabel, ylabel)
     plt.subplots_adjust(top=0.95)
+    plt.subplots_adjust(left=0.15)
     g.fig.suptitle(title)
     # plt.legend()
 

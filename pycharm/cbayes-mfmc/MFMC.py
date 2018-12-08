@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import scipy.stats as stats
+import pandas as pd
 
 import utils
 from Model import Model
@@ -363,14 +364,15 @@ class MFMC:
                 print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
                 exit()
 
+            plt.legend(loc=1)
             plt.grid(b=True)
-            plt.gcf().savefig('output/mfmc_densities.eps', dpi=300)
+            plt.gcf().savefig('output/mfmc_densities.pdf', dpi=300)
 
         else:
             # Seaborn pairplot of the high-fidelity push-forward
             utils.plot_multi_qoi(samples=self.models[-1].model_evals_pred)
             plt.grid(b=True)
-            plt.gcf().savefig('output/mfmc_hf_pairplot.eps', dpi=300)
+            plt.gcf().savefig('output/mfmc_hf_pairplot.pdf', dpi=300)
             plt.clf()
 
             # Plot marginals
@@ -419,7 +421,7 @@ class MFMC:
                     exit()
 
                 plt.grid(b=True)
-                plt.gcf().savefig('output/mfmc_densities_q%d.eps' % (k + 1), dpi=300)
+                plt.gcf().savefig('output/mfmc_densities_q%d.pdf' % (k + 1), dpi=300)
                 plt.clf()
 
         if self.models[0].n_qoi == 2:
@@ -437,10 +439,10 @@ class MFMC:
                 exit()
             plt.xlabel('$Q_1$')
             plt.ylabel('$Q_2$')
-            plt.legend(loc='upper right')
+            plt.legend(loc='upper left')
             plt.grid(b=True)
 
-            plt.gcf().savefig('output/mfmc_dists.eps', dpi=300)
+            plt.gcf().savefig('output/mfmc_dists.pdf', dpi=300)
             xmin, xmax = plt.xlim()
             ymin, ymax = plt.ylim()
             plt.clf()
@@ -448,19 +450,19 @@ class MFMC:
             self.models[0].distribution.plot_kde()
             plt.xlim([xmin, xmax])
             plt.ylim([ymin, ymax])
-            plt.gcf().savefig('output/mfmc_lf.eps', dpi=300)
+            plt.gcf().savefig('output/mfmc_lf.pdf', dpi=300)
             plt.clf()
 
             self.models[-1].distribution.plot_kde()
             plt.xlim([xmin, xmax])
             plt.ylim([ymin, ymax])
-            plt.gcf().savefig('output/mfmc_hf.eps', dpi=300)
+            plt.gcf().savefig('output/mfmc_hf.pdf', dpi=300)
 
             if mc and self.mc_model is not None:
                 self.mc_model.distribution.plot_kde()
                 plt.xlim([xmin, xmax])
                 plt.ylim([ymin, ymax])
-                plt.gcf().savefig('output/mfmc_mc.eps', dpi=300)
+                plt.gcf().savefig('output/mfmc_mc.pdf', dpi=300)
             elif mc and self.mc_model is None:
                 print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
                 exit()
@@ -491,7 +493,23 @@ class MFMC:
                 y_pred = np.squeeze(mu[sort_indices])
                 sigma = np.squeeze(sigma[sort_indices])
 
-                utils.plot_1d_conf(x_pred, y_pred, sigma)
+                if self.regression_type in ['gaussian_process_kde']:
+                    plt.figure(1)
+                    plt.plot(x_pred, y_pred, 'o', markersize=3, label='Predicted mean')
+    
+                    #mu_train, sigma_train = regression_model.predict(x_train, return_std=True)
+                    #noise_train = y_train - mu_train
+                
+                    #samples = np.vstack([np.squeeze(x_train), np.squeeze(noise_train)])                
+                    #df = pd.DataFrame(samples.T, columns=['$Q_1$', '$Q_2$'])
+                    #g = sns.jointplot(x='$Q_1$', y='$Q_2$', data=df, kind='kde', color='C0', shade=True, shade_lowest=True, cmap='Blues')
+                    #g.plot_joint(plt.scatter, c='k', alpha=0.3, s=25, linewidth=0.0, marker='*', label='Training data')
+                    #g.ax_joint.collections[0].set_alpha(0)
+                    #g.ax_joint.legend_.remove()
+                    #plt.subplots_adjust(top=0.95)
+                else:
+                    utils.plot_1d_conf(x_pred, y_pred, sigma)
+                    
                 utils.plot_1d_data(x_train, y_train, marker='*', linestyle='', markersize=5, color='k',
                                    label='Training data', xlabel=lf_model.rv_name, ylabel=hf_model.rv_name)
 
@@ -513,7 +531,7 @@ class MFMC:
                     utils.plot_1d_data(x_train[:, k], y_train[:, k], marker='*', linestyle='', markersize=5, color='k',
                                        label='Training data', xlabel=lf_model.rv_name, ylabel=hf_model.rv_name)
 
-                    plt.gcf().savefig('output/mfmc_regression_model_' + str(i + 1) + '_q' + str(k + 1) + '.eps',
+                    plt.gcf().savefig('output/mfmc_regression_model_' + str(i + 1) + '_q' + str(k + 1) + '.pdf',
                                       dpi=300)
                     plt.clf()
                 continue
@@ -557,9 +575,9 @@ class MFMC:
 
             plt.grid(b=True)
             if self.n_models > 2:
-                plt.gcf().savefig('output/mfmc_regression_model_' + str(i + 1) + '.eps', dpi=300)
+                plt.gcf().savefig('output/mfmc_regression_model_' + str(i + 1) + '.pdf', dpi=300)
             else:
-                plt.gcf().savefig('output/mfmc_regression_model.eps', dpi=300)
+                plt.gcf().savefig('output/mfmc_regression_model.pdf', dpi=300)
 
             plt.clf()
 
@@ -577,9 +595,9 @@ class MFMC:
 
                 plt.grid(b=True)
                 if self.n_models > 2:
-                    plt.gcf().savefig('output/mfmc_joint_dist_' + str(i + 1) + '.eps', dpi=300)
+                    plt.gcf().savefig('output/mfmc_joint_dist_' + str(i + 1) + '.pdf', dpi=300)
                 else:
-                    plt.gcf().savefig('output/mfmc_joint_dist.eps', dpi=300)
+                    plt.gcf().savefig('output/mfmc_joint_dist.pdf', dpi=300)
 
                 plt.clf()
 
@@ -597,9 +615,9 @@ class MFMC:
 
                     plt.grid(b=True)
                     if self.n_models > 2:
-                        plt.gcf().savefig('output/mfmc_joint_dist_' + str(i + 1) + '_q' + str(j + 1) + '.eps', dpi=300)
+                        plt.gcf().savefig('output/mfmc_joint_dist_' + str(i + 1) + '_q' + str(j + 1) + '.pdf', dpi=300)
                     else:
-                        plt.gcf().savefig('output/mfmc_joint_dist_q' + str(j + 1) + '.eps', dpi=300)
+                        plt.gcf().savefig('output/mfmc_joint_dist_q' + str(j + 1) + '.pdf', dpi=300)
 
                     plt.clf()
 

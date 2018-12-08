@@ -103,7 +103,7 @@ class Distribution:
                               num=fignum, xlabel=self.rv_name, ylabel='$p($' + self.rv_name + '$)$', color=color,
                               title=title)
         elif self.n_dim == 2:
-            utils.plot_2d_kde(samples=self.samples, num=fignum, title=title)
+            utils.plot_2d_kde(samples=self.samples, num=fignum, title=title, xlabel='$v$', ylabel='E')
         else:
             print('KDE plots are only available for 1 and 2 dimensions.')
             exit()

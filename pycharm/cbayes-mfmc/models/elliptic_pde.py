@@ -100,4 +100,4 @@ if __name__ == '__main__':
         print(np.corrcoef(samples_lowfi[:, 2], samples_highfi[:, 2])[0, 1])
 
     plt.show()
-    exit()
+    #exit()
