@@ -78,7 +78,6 @@ class Regression:
                 self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6,
                                                                                        n_restarts_optimizer=0))
                 self.regression_model[i].fit(self.x_train, self.y_train[:, i])
-
                                 
                 # Predict q_l|q_l-1 at all low-fidelity samples
                 self.mu[:, i], self.sigma[:, i] = self.regression_model[i].predict(self.x_pred, return_std=True)
@@ -101,7 +100,7 @@ class Regression:
                 ##plt.show()
                 #plt.gcf().savefig('output/mfmc_noise_model.pdf', dpi=300)
                 
-                joint_kde = gkde( [self.x_train[:,i], noise_train] ) 
+                joint_kde = gkde([self.x_train[:, i], noise_train])
                 
                 # Generate high-fidelity samples from the predictions
                 for j in range(self.mu.shape[0]):
@@ -109,22 +108,20 @@ class Regression:
                                         
                     # given x_pred, generate samples of y and average to get normalizing factor for slice of kde
                     Nsamp = 100
-                    nvals = np.random.uniform(low=nmin,high=nmax,size=Nsamp)
-                    kde_slice_samp = joint_kde( [self.x_pred[j]*np.ones(Nsamp), nvals] )
+                    nvals = np.random.uniform(low=nmin, high=nmax, size=Nsamp)
+                    kde_slice_samp = joint_kde([self.x_pred[j] * np.ones(Nsamp), nvals])
                     normfactor = np.mean(kde_slice_samp)
                     kde_slice_samp *= 1.0/normfactor
-                    ratio = np.divide(kde_slice_samp,1.0/(nmax-nmin)*np.ones(Nsamp))
-                    ratio *= 1.0/np.max(ratio)
+                    ratio = np.divide(kde_slice_samp, 1.0/(nmax-nmin)*np.ones(Nsamp))
+                    ratio *= 1.0 / np.max(ratio)
                     foundsamp = 0
                     ii = 0
                     while not foundsamp:
-                        if ratio[ii]>np.random.uniform(low=0,high=1,size=1):
+                        if ratio[ii] > np.random.uniform(low=0, high=1, size=1):
                             foundsamp = 1
                             hf_model_evals_pred[j, i] += nvals[ii]
                         else:
                             ii += 1
-                    
-                    
 
         elif self.regression_type == 'decoupled_gaussian_process':
 
@@ -385,7 +382,7 @@ class Regression:
 
                 mu_train, sigma_train = self.regression_model[i].predict(self.x_train, return_std=True)
                 noise_train = self.y_train[:, i] - mu_train
-                joint_kde = gkde( [self.x_train[:,i], noise_train] ) 
+                joint_kde = gkde([self.x_train[:, i], noise_train])
                 nmin = np.min(noise_train)
                 nmax = np.max(noise_train)
                 
@@ -395,22 +392,21 @@ class Regression:
                                         
                     # given x_pred, generate samples of y and average to get normalizing factor for slice of kde
                     Nsamp = 100
-                    nvals = np.random.uniform(low=nmin,high=nmax,size=Nsamp)
-                    kde_slice_samp = joint_kde( [self.x_pred[j]*np.ones(Nsamp), nvals] )
+                    nvals = np.random.uniform(low=nmin, high=nmax, size=Nsamp)
+                    kde_slice_samp = joint_kde([self.x_pred[j]*np.ones(Nsamp), nvals])
                     normfactor = np.mean(kde_slice_samp)
                     kde_slice_samp *= 1.0/normfactor
-                    ratio = np.divide(kde_slice_samp,1.0/(nmax-nmin)*np.ones(Nsamp))
+                    ratio = np.divide(kde_slice_samp, 1.0/(nmax-nmin)*np.ones(Nsamp))
                     ratio *= 1.0/np.max(ratio)
                     foundsamp = 0
                     ii = 0
                     while not foundsamp:
-                        if ratio[ii]>np.random.uniform(low=0,high=1,size=1):
+                        if ratio[ii] > np.random.uniform(low=0, high=1, size=1):
                             foundsamp = 1
                             hf_model_evals_pred[j, i] += nvals[ii]
                         else:
                             ii += 1
-                    
-                    
+
         else:
             print('Unknown regression model %s.' % self.regression_type)
             exit()

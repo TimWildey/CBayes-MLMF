@@ -94,6 +94,13 @@ class Distribution:
             warnings.warn('Warning: Negative KL: %f' % kl)
         return kl
 
+    # Estimate the l1 error between q and p
+    def calculate_l1_error(self, p):
+        q = self.eval_kernel_density()
+        p = p.kernel_density(np.squeeze(self.samples).T)
+        l1 = np.mean(np.abs(q - p))
+        return l1
+
     # Plot the KDE density
     def plot_kde(self, fignum=1, color='C0', linestyle='-', xmin=0.0, xmax=1.0, title='', label=None):
         if label is None:
