@@ -106,7 +106,6 @@ if __name__ == '__main__':
 
         l1_prior_pf_1hf_1lf = []
         for idx, n_evals in enumerate(n_evals_mfmc_hf_1lf):
-            # print('\nCalculating MFMC model %d / %d ...' % (idx + 1, len(n_evals_mfmc_hf)))
             n_evals = [n_evals_mfmc_lf_1lf[idx], n_evals]
             indices = np.random.choice(range(prior_samples.shape[0]), size=n_evals[0], replace=False)
 
@@ -139,7 +138,6 @@ if __name__ == '__main__':
         l1_prior_pf_1hf_2lf = []
         for idx, n_evals in enumerate(n_evals_mfmc_hf_2lf):
             n_evals = [n_evals_mfmc_lf_2lf[idx], n_evals_mfmc_mf_2lf[idx], n_evals]
-            # print('\nCalculating MFMC multi-model %d / %d ...' % (idx + 1, len(n_evals_mfmc_hf)))
             indices = np.random.choice(range(prior_samples.shape[0]), size=n_evals[0], replace=False)
 
             # Create a low-fidelity model

@@ -15,12 +15,12 @@ from MFMC import MFMC
 np.random.seed(42)
 
 # Number of samples for the Monte Carlo reference
-n_mc_ref = int(5e4)
+n_mc_ref = int(1e4)
 
 # ----------------------------------------------------Config - MFMC -------- #
 
 # Training set selection strategy
-training_set_strategy = 'sampling'
+training_set_strategy = 'support_covering'
 
 # Regression model type
 regression_type = 'heteroscedastic_gaussian_process'
@@ -33,24 +33,36 @@ if __name__ == '__main__':
     n_avg = 100
 
     # Evaluations
-    # (mc 20, hf 5, mf 25, lf 150)
     n_grid = 10
-    n_evals_mc = np.logspace(np.log10(20), np.log10(1200), n_grid)
+
+    # Monte Carlo
+    n_evals_mc = np.logspace(np.log10(20), np.log10(1000), n_grid)
     n_evals_mc = np.round(n_evals_mc).astype(int)
-    n_evals_mfmc_hf = np.logspace(np.log10(5), np.log10(300), n_grid)
-    n_evals_mfmc_hf = np.round(n_evals_mfmc_hf).astype(int)
-    n_evals_mfmc_mf = np.logspace(np.log10(25), np.log10(300), n_grid)
-    n_evals_mfmc_mf = np.round(n_evals_mfmc_mf).astype(int)
-    n_evals_mfmc_lf = np.logspace(np.log10(150), np.log10(10000), n_grid)
-    n_evals_mfmc_lf = np.round(n_evals_mfmc_lf).astype(int)
+
+    # MFMC 1lf
+    n_evals_mfmc_hf_1lf = np.logspace(np.log10(5), np.log10(150), n_grid)
+    n_evals_mfmc_hf_1lf = np.round(n_evals_mfmc_hf_1lf).astype(int)
+    n_evals_mfmc_lf_1lf = np.logspace(np.log10(150), np.log10(10000), n_grid)
+    # n_evals_mfmc_lf_1lf = n_grid * [10000]
+    n_evals_mfmc_lf_1lf = np.round(n_evals_mfmc_lf_1lf).astype(int)
+
+    # MFMC 2lf
+    n_evals_mfmc_hf_2lf = np.logspace(np.log10(5), np.log10(20), n_grid)
+    n_evals_mfmc_hf_2lf = np.round(n_evals_mfmc_hf_2lf).astype(int)
+    n_evals_mfmc_mf_2lf = np.logspace(np.log10(10), np.log10(200), n_grid)
+    n_evals_mfmc_mf_2lf = np.round(n_evals_mfmc_mf_2lf).astype(int)
+    n_evals_mfmc_lf_2lf = np.logspace(np.log10(150), np.log10(10000), n_grid)
+    # n_evals_mfmc_lf_2lf = n_grid * [10000]
+    n_evals_mfmc_lf_2lf = np.round(n_evals_mfmc_lf_2lf).astype(int)
 
     # Costs
     costs_hf = 1.0
     costs_mf = 0.25 * costs_hf
     costs_lf = 0.25 * costs_mf
-    total_costs_1lf = costs_hf * n_evals_mfmc_hf + costs_lf * n_evals_mfmc_lf
+    total_costs_1lf = costs_hf * n_evals_mfmc_hf_1lf + costs_lf * n_evals_mfmc_lf_1lf
     total_costs_1lf = np.round(total_costs_1lf).astype(int)
-    total_costs_2lf = (costs_hf + costs_mf) * n_evals_mfmc_hf + costs_mf * n_evals_mfmc_mf + costs_lf * n_evals_mfmc_lf
+    total_costs_2lf = (costs_hf + costs_mf) * n_evals_mfmc_hf_2lf + \
+        costs_mf * n_evals_mfmc_mf_2lf + costs_lf * n_evals_mfmc_lf_2lf
     total_costs_2lf = np.round(total_costs_2lf).astype(int)
 
     # Load data
@@ -69,10 +81,7 @@ if __name__ == '__main__':
 
     # Prior push-forward
     ref_p_prior_pf = Distribution(ref_prior_pf_samples, rv_name='$Q$', label='Prior-PF')
-
-    # Pre evaluations
-    ref_prior_pf_samples = np.squeeze(ref_prior_pf_samples)
-    ref_p_prior_pf_evals = ref_p_prior_pf.kernel_density(ref_prior_pf_samples.T)
+    ref_p_prior_pf.eval_kernel_density()
 
     kls_prior_pf_1hf_avg = np.zeros((n_grid, ))
     kls_prior_pf_1hf_1lf_avg = np.zeros((n_grid, ))
@@ -84,10 +93,10 @@ if __name__ == '__main__':
 
         kls_prior_pf_1hf = []
         for idx, n_evals in enumerate(n_evals_mc):
-            # print('\nCalculating MC model %d / %d ...' % (idx + 1, len(n_evals_mc)))
+            indices = np.random.choice(range(prior_pf_samples_hf.shape[0]), size=n_evals, replace=False)
 
-            # Brute force Monte Carlo
-            prior_pf_samples = prior_pf_samples_hf[0:n_evals]
+            # Monte Carlo model
+            prior_pf_samples = prior_pf_samples_hf[indices]
             p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
             # kl between prior push-forward and reference push-forward
@@ -96,14 +105,14 @@ if __name__ == '__main__':
         # -------------- 1 HF, 1 LF
 
         kls_prior_pf_1hf_1lf = []
-        for idx, n_evals in enumerate(n_evals_mfmc_hf):
-            # print('\nCalculating MFMC model %d / %d ...' % (idx + 1, len(n_evals_mfmc_hf)))
-            n_evals = [n_evals_mfmc_lf[idx], n_evals]
+        for idx, n_evals in enumerate(n_evals_mfmc_hf_1lf):
+            n_evals = [n_evals_mfmc_lf_1lf[idx], n_evals]
+            indices = np.random.choice(range(prior_samples.shape[0]), size=n_evals[0], replace=False)
 
             # Create a low-fidelity model
             lf_model = Model(
                 eval_fun=lambda x, samples=prior_pf_samples_lf: elliptic_pde.find_xy_pair(x, prior_samples, samples),
-                rv_samples=prior_samples[:n_evals[0]], rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0],
+                rv_samples=prior_samples[indices], rv_samples_pred=prior_samples[indices], n_evals=n_evals[0],
                 n_qoi=n_qoi, rv_name='$q_0$', label='Low-fidelity')
 
             # Create a high-fidelity model
@@ -114,8 +123,7 @@ if __name__ == '__main__':
             models = [lf_model, hf_model]
 
             # Setup MFMC
-            mfmc = MFMC(models=models,
-                         training_set_strategy=training_set_strategy, regression_type=regression_type)
+            mfmc = MFMC(models=models, training_set_strategy=training_set_strategy, regression_type=regression_type)
 
             # Apply MFMC
             mfmc.apply_mfmc_framework(verbose=False)
@@ -128,14 +136,14 @@ if __name__ == '__main__':
         # -------------- 1 HF, 2 LF
 
         kls_prior_pf_1hf_2lf = []
-        for idx, n_evals in enumerate(n_evals_mfmc_hf):
-            n_evals = [n_evals_mfmc_lf[idx], n_evals_mfmc_mf[idx], n_evals]
-            # print('\nCalculating MFMC multi-model %d / %d ...' % (idx + 1, len(n_evals_mfmc_hf)))
+        for idx, n_evals in enumerate(n_evals_mfmc_hf_2lf):
+            n_evals = [n_evals_mfmc_lf_2lf[idx], n_evals_mfmc_mf_2lf[idx], n_evals]
+            indices = np.random.choice(range(prior_samples.shape[0]), size=n_evals[0], replace=False)
 
             # Create a low-fidelity model
             lf_model = Model(
                 eval_fun=lambda x, samples=prior_pf_samples_lf: elliptic_pde.find_xy_pair(x, prior_samples, samples),
-                rv_samples=prior_samples[:n_evals[0]], rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0],
+                rv_samples=prior_samples[indices], rv_samples_pred=prior_samples[indices], n_evals=n_evals[0],
                 n_qoi=n_qoi, rv_name='$q_0$', label='Low-fidelity')
 
             # Create a mid-fidelity model
@@ -151,8 +159,7 @@ if __name__ == '__main__':
             models = [lf_model, mf_model, hf_model]
 
             # Setup MFMC
-            mfmc = MFMC(models=models,
-                         training_set_strategy=training_set_strategy, regression_type=regression_type)
+            mfmc = MFMC(models=models, training_set_strategy=training_set_strategy, regression_type=regression_type)
 
             # Apply MFMC
             mfmc.apply_mfmc_framework(verbose=False)
@@ -178,6 +185,6 @@ if __name__ == '__main__':
     plt.ylabel('KL')
     plt.legend(loc='upper right')
     plt.grid(b=True)
-    plt.gcf().savefig('elliptic_pde_1qoi_prior_pf_convergence.eps', dpi=300)
+    plt.gcf().savefig('elliptic_pde_1qoi_prior_pf_convergence_kl.eps', dpi=300)
 
 # --------------------------------------------------------------------------- #
