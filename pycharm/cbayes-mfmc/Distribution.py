@@ -98,7 +98,7 @@ class Distribution:
     def calculate_l1_error(self, p):
         q = self.eval_kernel_density()
         p = p.kernel_density(np.squeeze(self.samples).T)
-        l1 = np.mean(np.abs(q - p))
+        l1 = np.mean(np.abs(q - p) / q)
         return l1
 
     # Plot the KDE density
