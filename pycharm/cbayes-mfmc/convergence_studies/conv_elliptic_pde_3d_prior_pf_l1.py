@@ -83,10 +83,6 @@ if __name__ == '__main__':
     ref_p_prior_pf = Distribution(ref_prior_pf_samples, rv_name='$Q$', label='Prior-PF')
     ref_p_prior_pf.eval_kernel_density()
 
-    # Pre evaluations
-    ref_prior_pf_samples = np.squeeze(ref_prior_pf_samples)
-    ref_p_prior_pf_evals = ref_p_prior_pf.kernel_density(ref_prior_pf_samples.T)
-
     l1_prior_pf_1hf_avg = np.zeros((n_grid,))
     l1_prior_pf_1hf_1lf_avg = np.zeros((n_grid,))
     l1_prior_pf_1hf_2lf_avg = np.zeros((n_grid,))
