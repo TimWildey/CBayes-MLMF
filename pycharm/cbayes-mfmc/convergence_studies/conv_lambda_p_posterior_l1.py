@@ -35,15 +35,13 @@ if __name__ == '__main__':
     # Evaluations
     n_fac_mf = 2
     n_grid = 10
-    n_evals_mc = np.logspace(np.log10(5), np.log10(1000), n_grid)
+    n_evals_mc = np.logspace(np.log10(60), np.log10(1000), n_grid)
     n_evals_mc = np.round(n_evals_mc).astype(int)
     n_evals_mfmc_hf = np.logspace(np.log10(5), np.log10(200), n_grid)
     n_evals_mfmc_hf = np.round(n_evals_mfmc_hf).astype(int)
     n_evals_mfmc_mf = n_fac_mf * n_evals_mfmc_hf
     n_evals_mfmc_lf = [n_mc_ref] * 10
     n_evals_mfmc_lf = np.round(n_evals_mfmc_lf).astype(int)
-    n_evals_all = n_evals_mc.tolist() + list(set(n_evals_mfmc_hf.tolist()) - set(n_evals_mc.tolist()))
-    n_evals_all.sort()
 
     # Costs
     costs_hf = 1.0
@@ -75,15 +73,26 @@ if __name__ == '__main__':
     ref_p_prior_pf = Distribution(ref_prior_pf_samples, rv_name='$Q$', label='Prior-PF')
     ref_p_prior_pf.eval_kernel_density()
 
-    l1_prior_pf_1hf_avg = np.zeros((n_grid,))
-    l1_prior_pf_1hf_1lf_avg = np.zeros((n_grid,))
-    l1_prior_pf_1hf_2lf_avg = np.zeros((n_grid,))
+    # Observed density
+    obs_loc = [0.25]
+    obs_scale = [0.1]
+    obs_samples = np.random.randn(n_mc_ref, len(obs_scale)) * obs_scale + obs_loc
+    obs_samples = np.reshape(obs_samples, (n_mc_ref, np.shape(obs_samples)[1]))
+    p_obs = Distribution(obs_samples, rv_name='$Q$', label='Observed')
+    p_obs_evals = p_obs.kernel_density(ref_prior_pf_samples.T)
+
+    # Reference r
+    ref_r = p_obs_evals / (ref_p_prior_pf.kernel_density(ref_prior_pf_samples.T) + 1.0e-10)
+
+    l1_posterior_1hf_avg = np.zeros((n_grid, ))
+    l1_posterior_1hf_1lf_avg = np.zeros((n_grid, ))
+    l1_posterior_1hf_2lf_avg = np.zeros((n_grid, ))
     for k in range(n_avg):
-        print('\nRun %d / %d' % (k + 1, n_avg))
+        print('\nRun %d / %d' % (k+1, n_avg))
 
         # -------------- 1 HF
 
-        l1_prior_pf_1hf = []
+        l1_posterior_1hf = []
         for idx, n_evals in enumerate(n_evals_mc):
             indices = np.random.choice(range(prior_samples.shape[0]), size=n_evals, replace=False)
 
@@ -93,12 +102,13 @@ if __name__ == '__main__':
             prior_pf_samples = model.evaluate()
             p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-            # l1 error between prior push-forward and reference push-forward
-            l1_prior_pf_1hf.append(ref_p_prior_pf.calculate_l1_error(p_prior_pf))
+            # l1 error between mfmc posterior and reference posterior
+            r = p_obs_evals / (p_prior_pf.kernel_density(ref_prior_pf_samples.T) + 1.0e-10)
+            l1_posterior_1hf.append(np.mean(np.abs(ref_r - r)))
 
         # -------------- 1 HF, 1 LF
 
-        l1_prior_pf_1hf_1lf = []
+        l1_posterior_1hf_1lf = []
         for idx, n_evals in enumerate(n_evals_mfmc_hf):
             n_evals = [n_evals_mfmc_lf[idx], n_evals]
             indices = np.random.choice(range(prior_samples.shape[0]), size=n_evals[0], replace=False)
@@ -122,12 +132,13 @@ if __name__ == '__main__':
             prior_pf_samples = mfmc.get_samples()[-1, :, :]
             p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-            # l1 error between prior push-forward and reference push-forward
-            l1_prior_pf_1hf_1lf.append(ref_p_prior_pf.calculate_l1_error(p_prior_pf))
+            # l1 error between mfmc posterior and reference posterior
+            r = p_obs_evals / (p_prior_pf.kernel_density(ref_prior_pf_samples.T) + 1.0e-10)
+            l1_posterior_1hf_1lf.append(np.mean(np.abs(ref_r - r)))
 
         # -------------- 1 HF, 2 LF
 
-        l1_prior_pf_1hf_2lf = []
+        l1_posterior_1hf_2lf = []
         for idx, n_evals in enumerate(n_evals_mfmc_hf):
             n_evals = [n_evals_mfmc_lf[idx], n_evals_mfmc_mf[idx], n_evals]
             indices = np.random.choice(range(prior_samples.shape[0]), size=n_evals[0], replace=False)
@@ -155,22 +166,29 @@ if __name__ == '__main__':
             prior_pf_samples = mfmc.get_samples()[-1, :, :]
             p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-            # l1 error between prior push-forward and reference push-forward
-            l1_prior_pf_1hf_2lf.append(ref_p_prior_pf.calculate_l1_error(p_prior_pf))
+            # l1 error between mfmc posterior and reference posterior
+            r = p_obs_evals / (p_prior_pf.kernel_density(ref_prior_pf_samples.T) + 1.0e-10)
+            l1_posterior_1hf_2lf.append(np.mean(np.abs(ref_r - r)))
 
-        l1_prior_pf_1hf_avg += 1 / n_avg * np.asarray(l1_prior_pf_1hf)
-        l1_prior_pf_1hf_1lf_avg += 1 / n_avg * np.asarray(l1_prior_pf_1hf_1lf)
-        l1_prior_pf_1hf_2lf_avg += 1 / n_avg * np.asarray(l1_prior_pf_1hf_2lf)
+        l1_posterior_1hf_avg += 1 / n_avg * np.asarray(l1_posterior_1hf)
+        l1_posterior_1hf_1lf_avg += 1 / n_avg * np.asarray(l1_posterior_1hf_1lf)
+        l1_posterior_1hf_2lf_avg += 1 / n_avg * np.asarray(l1_posterior_1hf_2lf)
+
+    n_evals_all = np.logspace(np.log10(5), np.log10(1000), 2)
+    n_evals_all = np.round(n_evals_all).astype(int)
 
     plt.figure()
-    plt.semilogx(np.squeeze(n_evals_mc), l1_prior_pf_1hf_avg, '-o', label='1 HF')
-    plt.semilogx(np.squeeze(total_costs_1lf), l1_prior_pf_1hf_1lf_avg, '-o', label='1 HF, 1 LF')
-    plt.semilogx(np.squeeze(total_costs_2lf), l1_prior_pf_1hf_2lf_avg, '-o', label='1 HF, 1 MF, 1 LF')
+    plt.semilogx(np.squeeze(n_evals_mc), l1_posterior_1hf_avg, '-o', label='1 HF')
+    plt.semilogx(np.squeeze(total_costs_1lf), l1_posterior_1hf_1lf_avg, '-o', label='1 HF, 1 LF')
+    plt.semilogx(np.squeeze(total_costs_2lf), l1_posterior_1hf_2lf_avg, '-o', label='1 HF, 1 MF, 1 LF')
     plt.semilogx(np.squeeze(n_evals_all), np.zeros((len(n_evals_all))), 'k--')
     plt.xlabel('No. HF samples')
     plt.ylabel('L1 error')
     plt.legend(loc='upper right')
     plt.grid(b=True)
-    plt.gcf().savefig('lambda_p_prior_pf_convergence_l1.eps', dpi=300)
+    plt.gcf().savefig('lambda_p_posterior_convergence_l1.eps', dpi=300)
+    np.save('lambda_p_posterior_convergence_l1', [l1_posterior_1hf_avg,
+                                                  l1_posterior_1hf_1lf_avg,
+                                                  l1_posterior_1hf_2lf_avg])
 
 # --------------------------------------------------------------------------- #

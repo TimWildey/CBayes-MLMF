@@ -33,7 +33,6 @@ if __name__ == '__main__':
     n_avg = 100
 
     # Evaluations
-    # (mc 20, hf 5, mf 20, lf 200)
     n_grid = 10
 
     # Monte Carlo
@@ -99,7 +98,7 @@ if __name__ == '__main__':
             prior_pf_samples = prior_pf_samples_hf[indices]
             p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-            # kl between prior push-forward and reference push-forward
+            # l1 error between prior push-forward and reference push-forward
             l1_prior_pf_1hf.append(ref_p_prior_pf.calculate_l1_error(p_prior_pf))
 
         # -------------- 1 HF, 1 LF
@@ -131,7 +130,7 @@ if __name__ == '__main__':
             prior_pf_samples = mfmc.get_samples()[-1, :, :]
             p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-            # kl between prior push-forward and reference push-forward
+            # l1 error between prior push-forward and reference push-forward
             l1_prior_pf_1hf_1lf.append(ref_p_prior_pf.calculate_l1_error(p_prior_pf))
 
         # -------------- 1 HF, 2 LF
@@ -168,7 +167,7 @@ if __name__ == '__main__':
             prior_pf_samples = mfmc.get_samples()[-1, :, :]
             p_prior_pf = Distribution(prior_pf_samples, rv_name='$Q$', label='Prior-PF')
 
-            # kl between prior push-forward and reference push-forward
+            # l1 error between prior push-forward and reference push-forward
             l1_prior_pf_1hf_2lf.append(ref_p_prior_pf.calculate_l1_error(p_prior_pf))
 
         l1_prior_pf_1hf_avg += 1 / n_avg * np.asarray(l1_prior_pf_1hf)
