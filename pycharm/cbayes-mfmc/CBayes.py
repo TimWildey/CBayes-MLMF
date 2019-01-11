@@ -157,7 +157,6 @@ class CBayesPosterior:
     # Plot posterior
     def plot_posterior(self, fignum=1, color='C0', linestyle='-', label='Posterior', save_fig=False):
 
-        # Plot the posterior only if the input and output space is one-dimensional
         if self.p_obs.n_dim == 1 and self.p_post.n_dim == 1:
             self.p_post.create_kernel_density()
             xmin = np.min(self.p_prior.samples, axis=0)
@@ -166,18 +165,17 @@ class CBayesPosterior:
             if save_fig:
                 plt.grid(b=True)
                 plt.gcf().savefig('output/cbayes_post_densities.pdf', dpi=300)
+
         elif self.p_post.n_dim == 2:
-            #self.p_post.create_kernel_density()
-            #xmin = np.min(self.p_prior.samples, axis=0)
-            #xmax = np.max(self.p_prior.samples, axis=0)
+            self.p_post.create_kernel_density()
             self.p_post.plot_kde(fignum=fignum, color=color, linestyle=linestyle, label=label)
-            #if save_fig:
-            xmin = np.min(self.p_prior.samples[:,0], axis=0)
-            xmax = np.max(self.p_prior.samples[:,0], axis=0)
-            ymin = np.min(self.p_prior.samples[:,1], axis=0)
-            ymax = np.max(self.p_prior.samples[:,1], axis=0)
-            plt.xlim([xmin, xmax])
-            plt.ylim([ymin, ymax])
-            plt.grid(b=True)
-            plt.gcf().savefig('output/cbayes_post_densities.pdf', dpi=300)
-            plt.clf()
+            if save_fig:
+                xmin = np.min(self.p_prior.samples[:, 0], axis=0)
+                xmax = np.max(self.p_prior.samples[:, 0], axis=0)
+                ymin = np.min(self.p_prior.samples[:, 1], axis=0)
+                ymax = np.max(self.p_prior.samples[:, 1], axis=0)
+                plt.xlim([xmin, xmax])
+                plt.ylim([ymin, ymax])
+                plt.grid(b=True)
+                plt.gcf().savefig('output/cbayes_post_densities.pdf', dpi=300)
+                plt.clf()

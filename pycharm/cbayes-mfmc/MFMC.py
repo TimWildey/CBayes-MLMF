@@ -358,15 +358,16 @@ class MFMC:
                 self.models[i].distribution.plot_kde(fignum=1, color=color, xmin=xmin, xmax=xmax)
 
             if mc and self.mc_model is not None:
-                self.mc_model.distribution.plot_kde(fignum=1, color='k', linestyle='--',
-                                                    xmin=xmin, xmax=xmax)
+                self.mc_model.distribution.plot_kde(fignum=1, color='k', linestyle='--', xmin=xmin, xmax=xmax)
+
             elif mc and self.mc_model is None:
                 print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
                 exit()
 
-            plt.legend(loc=1)
+            #plt.legend(loc='center left', bbox_to_anchor=(1.01, 0.51))
+            plt.legend(loc='best')
             plt.grid(b=True)
-            plt.gcf().savefig('output/mfmc_densities.pdf', dpi=300)
+            plt.gcf().savefig('output/mfmc_densities.pdf', dpi=300, bbox_inches='tight')
 
         else:
             # Seaborn pairplot of the high-fidelity push-forward

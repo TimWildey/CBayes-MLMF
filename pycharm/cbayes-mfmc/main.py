@@ -35,7 +35,7 @@ np.random.seed(42)
 #   - elliptic_pde_3d
 #   - linear_elasticity
 
-model = 'elliptic_pde'
+model = 'linear_elasticity'
 
 # Forward UQ method:
 #   - mc
@@ -47,12 +47,12 @@ fw_uq_method = 'mfmc'
 
 # Number of model evaluations in increasing fidelity starting with the lowest fidelity
 
-n_evals = [10000, 200, 20]
+n_evals = [10000, 100]
 n_models = len(n_evals)
 
 # Number of samples for the Monte Carlo reference
 
-n_mc_ref = int(5e4)
+n_mc_ref = int(1e4)
 
 # Training set selection strategies:
 #   - support_covering
@@ -66,8 +66,9 @@ training_set_strategy = 'fixed'
 #   - heteroscedastic_gaussian_process
 #   - decoupled_gaussian_process
 #   - decoupled_heteroscedastic_gaussian_process
+#   - gaussian_process_kde
 
-regression_type = 'gaussian_process_kde'
+regression_type = 'gaussian_process'
 
 # ------------------------------------------------- Models & Methods -------- #
 
@@ -108,7 +109,7 @@ def get_prior_prior_pf_samples():
 
             # Create a high-fidelity model
             hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 5), n_evals=n_evals[-1],
-                             n_qoi=n_qoi, rv_name='$Q$', label='High-fidelity')
+                             n_qoi=n_qoi, rv_name='$Q$', label='Multi-fidelity (low, mid, high)')
 
             if n_models == 2:
                 models = [lf_model, hf_model]
@@ -117,7 +118,7 @@ def get_prior_prior_pf_samples():
             elif n_models == 3:
 
                 mf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 3), n_evals=n_evals[1], n_qoi=n_qoi,
-                                 rv_name='$q_1$', label='Mid-fidelity')
+                                 rv_name='$q_1$', label='Multi-fidelity (low, mid)')
                 models = [lf_model, mf_model, hf_model]
 
             else:
@@ -204,9 +205,6 @@ def get_prior_prior_pf_samples():
         obs_scale = [0.01]
 
         lf_data, hf_data, prior_samples = linear_elasticity.load_data()
-        n_hf = hf_data.shape[0]
-        n_lf = lf_data.shape[0]
-        #prior_samples = np.reshape(range(n_lf), (n_lf, 1))  # we only need some id here
 
         if fw_uq_method == 'mc':
             print('No MC reference available.')
@@ -234,8 +232,8 @@ def get_prior_prior_pf_samples():
                 eval_fun=lambda x, samples=samples: samples[x],
                 n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='Multi-fidelity (low, high)')
 
-            data = np.zeros((n_evals[-1],1))
-            data[:,0] = samples
+            data = np.zeros((n_evals[-1], 1))
+            data[:, 0] = samples
             hf_model.set_model_evals(data)
             
             models = [lf_model, hf_model]
@@ -257,7 +255,7 @@ def get_prior_prior_pf_samples():
     if fw_uq_method == 'mfmc':
         # Setup MFMC
         mfmc = MFMC(models=models, mc_model=mc_model,
-                     training_set_strategy=training_set_strategy, regression_type=regression_type)
+                    training_set_strategy=training_set_strategy, regression_type=regression_type)
 
         # Apply MFMC
         mfmc.apply_mfmc_framework()
@@ -322,7 +320,6 @@ if __name__ == '__main__':
 
     # Plotting and postprocessing (a bit messy...)
     cbayes_post.plot_results(model_tag='hf')
-    cbayes_post.plot_posterior()
     
     end = time.time()
     print('(High-fidelity CBayes elapsed time: %fs)\n' % (end - lap))
@@ -380,6 +377,8 @@ if __name__ == '__main__':
         if model is 'lambda_p':
             cbayes_post.plot_posterior(fignum=5, color='C%d' % (n_models - 1), label='Multi-fidelity (low, mid, high)')
             cbayes_post_mc.plot_posterior(fignum=5, color='k', linestyle='--', label='MC reference', save_fig=True)
+        if model is 'linear_elasticity':
+            cbayes_post.plot_posterior(save_fig=True)
 
         end = time.time()
         print('(Low-fidelities CBayes elapsed time: %fs)\n' % (end - lap))
@@ -400,7 +399,7 @@ if __name__ == '__main__':
                 label = 'Mid-%d-Fidelity' % (i + 1)
             plt.plot(i + 1, kls[i], 'C%do' % i, markersize=10, label=label)
         plt.grid()
-        plt.legend(loc='lower right')
+        plt.legend(loc='best')
         plt.ylabel('KL')
         plt.xticks([])
         plt.gcf().savefig('output/cbayes_prior_post_kls.pdf', dpi=300)
@@ -421,7 +420,7 @@ if __name__ == '__main__':
                     label = 'Mid-%d-Fidelity' % (i + 1)
                 plt.plot(i + 1, pf_kls[i], 'C%do' % i, markersize=10, label=label)
             plt.grid()
-            plt.legend(loc='upper right')
+            plt.legend(loc='best')
             plt.ylabel('KL')
             plt.xticks([])
             plt.gcf().savefig('output/mfmc_prior_pf_kls.pdf', dpi=300)

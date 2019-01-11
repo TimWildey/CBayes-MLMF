@@ -35,6 +35,4 @@ if __name__ == '__main__':
     plt.plot(lf[:100], hf, 'k*')
     plt.show()
 
-
     print('LF-HF correlations: %f' % np.corrcoef(lf[:100], hf)[0, 1])
-    #exit()
