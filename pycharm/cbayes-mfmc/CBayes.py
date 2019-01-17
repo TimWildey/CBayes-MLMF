@@ -43,7 +43,7 @@ class CBayesPosterior:
 
         # Calculate the weights
         r = np.divide(self.p_obs.kernel_density(np.squeeze(self.p_prior_pf.samples).T) + 1e-10,
-                      self.p_prior_pf.kernel_density(np.squeeze(self.p_prior_pf.samples).T) + 1e-10)
+                      self.p_prior_pf.kernel_density(np.squeeze(self.p_prior_pf.samples).T))
 
         # Check against
         check = np.random.uniform(low=0, high=1, size=r.size)
@@ -60,7 +60,7 @@ class CBayesPosterior:
         if self.acc_rate < 1.0e-2:
             warnings.warn('Small acceptance rate: %f / %d accepted samples.' % (self.acc_rate, idx.size))
 
-        return self.p_prior.samples[idx], self.p_obs.samples[idx]
+        return self.p_prior.samples[idx], self.p_prior_pf.samples[idx]
 
     # Create the posterior and its push-forward
     def setup_posterior_and_pf(self):

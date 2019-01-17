@@ -536,25 +536,6 @@ class MFMC:
                     plt.clf()
                 continue
 
-            elif self.regression_type in ['shared_gaussian_process', 'shared_heteroscedastic_gaussian_process']:
-
-                x_pred = regression_model.x_pred
-                x_pred = x_pred.reshape(x_pred.size)
-                mu = regression_model.mu
-                mu = mu.reshape(mu.size)
-                sigma = regression_model.sigma
-                sigma = sigma.reshape(sigma.size)
-
-                # Sort to be able to use the plt.fill
-                sort_indices = np.argsort(x_pred, axis=0)
-                x_pred = np.squeeze(x_pred[sort_indices])
-                y_pred = np.squeeze(mu[sort_indices])
-                sigma = np.squeeze(sigma[sort_indices])
-
-                utils.plot_1d_conf(x_pred, y_pred, sigma)
-                utils.plot_1d_data(x_train, y_train, marker='*', linestyle='', markersize=5, color='k',
-                                   label='Training data', xlabel=lf_model.rv_name, ylabel=hf_model.rv_name)
-
             elif hf_model.n_qoi == 2:
 
                 sns.kdeplot(lf_model.distribution.samples[:, 0], lf_model.distribution.samples[:, 1],
@@ -591,7 +572,7 @@ class MFMC:
                 hf_model = self.models[i + 1]
 
                 samples = np.vstack([np.squeeze(lf_model.model_evals_pred), np.squeeze(hf_model.model_evals_pred)])
-                utils.plot_2d_kde(samples=samples.T)
+                utils.plot_2d_kde(samples=samples.T, xlabel=lf_model.rv_name, ylabel=hf_model.rv_name)
 
                 plt.grid(b=True)
                 if self.n_models > 2:
@@ -601,8 +582,7 @@ class MFMC:
 
                 plt.clf()
 
-        elif self.regression_type in ['decoupled_gaussian_process', 'decoupled_heteroscedastic_gaussian_process',
-                                      'shared_gaussian_process', 'shared_heteroscedastic_gaussian_process']:
+        elif self.regression_type in ['decoupled_gaussian_process', 'decoupled_heteroscedastic_gaussian_process']:
 
             for i in range(self.n_models - 1):
                 lf_model = self.models[i]

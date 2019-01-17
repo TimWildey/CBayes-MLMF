@@ -332,7 +332,7 @@ if __name__ == '__main__':
         if prior_pf_mc_samples is not None:
             # Monte Carlo comparison
             lap = time.time()
-            p_prior_pf_mc = Distribution(prior_pf_mc_samples, rv_name='$Q$', label='Prior-PF')
+            p_prior_pf_mc = Distribution(prior_pf_mc_samples, rv_name='$Q$', label='PF Initial')
             cbayes_post_mc = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_mc)
             cbayes_post_mc.setup_posterior_and_pf()
             print('Evaluating the Monte Carlo posterior ...')
@@ -352,7 +352,7 @@ if __name__ == '__main__':
         for i in range(n_models - 1):
 
             print('Evaluating the low-fidelity posteriors %d / %d ...' % (i + 1, n_models - 1))
-            p_prior_pf_lf = Distribution(prior_pf_samples[i, :, :], rv_name='$Q$', label='Prior-PF')
+            p_prior_pf_lf = Distribution(prior_pf_samples[i, :, :], rv_name='$Q$', label='PF Initial')
             cbayes_post_lf = CBayesPosterior(p_obs=p_obs, p_prior=p_prior, p_prior_pf=p_prior_pf_lf)
             cbayes_post_lf.setup_posterior_and_pf()
             cbayes_post_lf.print_stats()

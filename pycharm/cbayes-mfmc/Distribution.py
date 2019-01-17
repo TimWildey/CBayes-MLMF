@@ -106,11 +106,14 @@ class Distribution:
         if label is None:
             label = self.label
         if self.n_dim == 1:
+            if self.rv_name == r'$\lambda$':
+                ylab = r'$\pi_{\Lambda}(\lambda)$'
+            else:
+                ylab = r'$\pi_{\mathcal{D}}($' + self.rv_name + '$)$'
             utils.plot_1d_kde(qkde=self.kernel_density, xmin=xmin, xmax=xmax, label=label, linestyle=linestyle,
-                              num=fignum, xlabel=self.rv_name, ylabel='$p($' + self.rv_name + '$)$', color=color,
-                              title=title)
+                              num=fignum, xlabel=self.rv_name, ylabel=ylab, color=color, title=title)
         elif self.n_dim == 2:
-            utils.plot_2d_kde(samples=self.samples, num=fignum, title=title, xlabel='$v$', ylabel='E')
+            utils.plot_2d_kde(samples=self.samples, num=fignum, title=title, xlabel=r'$\nu$', ylabel='$E$')
         else:
             print('KDE plots are only available for 1 and 2 dimensions.')
             exit()

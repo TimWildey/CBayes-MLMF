@@ -186,5 +186,8 @@ if __name__ == '__main__':
     plt.legend(loc='upper right')
     plt.grid(b=True)
     plt.gcf().savefig('elliptic_pde_1qoi_prior_pf_convergence_l1.eps', dpi=300)
+    np.save('elliptic_pde_1qoi_prior_pf_convergence_l1', [l1_prior_pf_1hf_avg,
+                                                          l1_prior_pf_1hf_1lf_avg,
+                                                          l1_prior_pf_1hf_2lf_avg])
 
 # --------------------------------------------------------------------------- #
