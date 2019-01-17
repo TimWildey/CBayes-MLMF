@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import scipy.stats as stats
-import pandas as pd
 
 import utils
 from Model import Model
@@ -364,7 +363,7 @@ class MFMC:
                 print('No Monte Carlo reference samples available. Call calculate_mc_reference() first.')
                 exit()
 
-            #plt.legend(loc='center left', bbox_to_anchor=(1.01, 0.51))
+            # plt.legend(loc='center left', bbox_to_anchor=(1.01, 0.51))
             plt.legend(loc='best')
             plt.grid(b=True)
             plt.gcf().savefig('output/mfmc_densities.pdf', dpi=300, bbox_inches='tight')

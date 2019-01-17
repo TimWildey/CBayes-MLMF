@@ -106,8 +106,7 @@ class CBayesPosterior:
         print('Posterior integral:\t\t\t\t%f' % np.mean(self.r))
 
         # The KL between posterior and prior (i.e. how informative is the data?)
-        # (add a very small number to avoid taking log(0))
-        # This is done via r, because doing KDE for the prior / posterior densities can be hard when the number of
+        # This is done via r / doing KDE for the prior and posterior densities is infeasible when the number of
         # random variables is large.
         print('Posterior-Prior KL:\t\t\t\t%f' % np.mean(self.r * np.log(self.r)))
 

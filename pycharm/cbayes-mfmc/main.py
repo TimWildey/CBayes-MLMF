@@ -218,19 +218,17 @@ def get_prior_prior_pf_samples():
             # Create a low-fidelity model
             samples = lf_data[:n_evals[0]]
             lf_prior_samples = prior_samples[:n_evals[0], 0:n_qoi]
-            lf_model = Model(
-                eval_fun=lambda x, samples=samples: samples[x],
-                rv_samples=lf_prior_samples, rv_samples_pred=lf_prior_samples, n_evals=n_evals[0],
-                n_qoi=n_qoi, rv_name='$q_0$', label='Low-fidelity')
+            lf_model = Model(eval_fun=lambda x, samples=samples: samples[x], rv_samples=lf_prior_samples,
+                             rv_samples_pred=lf_prior_samples, n_evals=n_evals[0], n_qoi=n_qoi, rv_name='$q_0$',
+                             label='Low-fidelity')
             data = np.zeros((n_evals[0],1))
-            data[:,0] = samples
+            data[:, 0] = samples
             lf_model.set_model_evals(data)
 
             # Create a high-fidelity model
             samples = hf_data[:n_evals[-1]]
-            hf_model = Model(
-                eval_fun=lambda x, samples=samples: samples[x],
-                n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='Multi-fidelity (low, high)')
+            hf_model = Model(eval_fun=lambda x, samples=samples: samples[x],n_evals=n_evals[-1], n_qoi=n_qoi,
+                             rv_name='$Q$', label='Multi-fidelity (low, high)')
 
             data = np.zeros((n_evals[-1], 1))
             data[:, 0] = samples
@@ -437,7 +435,7 @@ if __name__ == '__main__':
     else:
         os.mkdir('output/' + outdirname)
 
-    # Move pngs into output folder
+    # Move pdfs and log into output folder
     os.system('mv output/*.pdf output/' + outdirname + '/')
     os.system('mv output/output.txt output/' + outdirname + '/')
 

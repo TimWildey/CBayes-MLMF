@@ -19,9 +19,10 @@ A data structure for regression models.
 Plotting functionality.
 
 ## models/
-Includes some model problems to generate samples from:
+Includes some model problems to generate/load samples from:
 * elliptic_pde.py: a single-phase incompressible flow model
 * lambda_p.py: a polynomial model
+* linear_elasticity.py: a linear (crystal) elasticity model
 
 ## output/
 Figures are stored in here as well as console output.
@@ -77,4 +78,12 @@ Some scripts to examine the convergence behavior.
 * n_evals = [10000, 1000, 100]
 * n_mc_ref = int(5e4)
 * training_set_strategy = 'sampling'
-* regression_type = 'heteroscedastic_gaussian_process' 
+* regression_type = 'heteroscedastic_gaussian_process'
+
+### 4.3
+
+* model = 'linear_elasticity'
+* fw_uq_method = 'mfmc'
+* n_evals = [10000, 100]
+* training_set_strategy = 'fixed'
+* regression_type = 'gaussian_process'
