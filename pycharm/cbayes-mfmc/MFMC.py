@@ -366,7 +366,8 @@ class MFMC:
             # plt.legend(loc='center left', bbox_to_anchor=(1.01, 0.51))
             plt.legend(loc='best')
             plt.grid(b=True)
-            plt.gcf().savefig('output/mfmc_densities.pdf', dpi=300, bbox_inches='tight')
+            plt.gcf().savefig('output/mfmc_densities.pdf', dpi=300)
+            # plt.gcf().savefig('output/mfmc_densities.pdf', dpi=300, bbox_inches='tight')
 
         else:
             # Seaborn pairplot of the high-fidelity push-forward

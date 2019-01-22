@@ -52,7 +52,7 @@ n_models = len(n_evals)
 
 # Number of samples for the Monte Carlo reference
 
-n_mc_ref = int(1e4)
+n_mc_ref = int(5e4)
 
 # Training set selection strategies:
 #   - support_covering
@@ -105,11 +105,11 @@ def get_prior_prior_pf_samples():
             # Create a low-fidelity model
             lf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 1), rv_samples=prior_samples[:n_evals[0]],
                              rv_samples_pred=prior_samples[:n_evals[0]], n_evals=n_evals[0], n_qoi=n_qoi,
-                             rv_name='$q_0$', label='Low-fidelity')
+                             rv_name='Low-fidelity: $q_0$', label='Low-fidelity')
 
             # Create a high-fidelity model
             hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 5), n_evals=n_evals[-1],
-                             n_qoi=n_qoi, rv_name='$Q$', label='Multi-fidelity (low, mid, high)')
+                             n_qoi=n_qoi, rv_name='High-fidelity: $Q$', label='Multi-fidelity (low, mid, high)')
 
             if n_models == 2:
                 models = [lf_model, hf_model]
@@ -118,7 +118,7 @@ def get_prior_prior_pf_samples():
             elif n_models == 3:
 
                 mf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 3), n_evals=n_evals[1], n_qoi=n_qoi,
-                                 rv_name='$q_1$', label='Multi-fidelity (low, mid)')
+                                 rv_name='Mid-fidelity: $q_1$', label='Multi-fidelity (low, mid)')
                 models = [lf_model, mf_model, hf_model]
 
             else:
@@ -147,7 +147,7 @@ def get_prior_prior_pf_samples():
         prior_samples = np.reshape(range(n_mc_ref), (n_mc_ref, 1))  # we only need some id here
 
         mc_model = Model(eval_fun=None, rv_samples=prior_samples, rv_samples_pred=prior_samples,
-                         n_evals=n_mc_ref, n_qoi=n_qoi, rv_name='$Q$', label='MC reference')
+                         n_evals=n_mc_ref, n_qoi=n_qoi, rv_name='High-fidelity: $Q$', label='MC reference')
         mc_model.set_model_evals(prior_pf_samples[-1][:n_mc_ref, 0:n_qoi])
 
         if fw_uq_method == 'mc':
@@ -170,13 +170,13 @@ def get_prior_prior_pf_samples():
             lf_model = Model(
                 eval_fun=lambda x, samples=samples: elliptic_pde.find_xy_pair(x, lf_prior_samples, samples),
                 rv_samples=lf_prior_samples, rv_samples_pred=lf_prior_samples, n_evals=n_evals[0],
-                n_qoi=n_qoi, rv_name='$q_0$', label='Low-fidelity')
+                n_qoi=n_qoi, rv_name='Low-fidelity: $q_0$', label='Low-fidelity')
 
             # Create a high-fidelity model
             samples = prior_pf_samples[-1][:n_evals[0], 0:n_qoi]
             hf_model = Model(
                 eval_fun=lambda x, samples=samples: elliptic_pde.find_xy_pair(x, lf_prior_samples, samples),
-                n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='$Q$', label='Multi-fidelity (low, mid, high)')
+                n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='High-fidelity: $Q$', label='Multi-fidelity (low, mid, high)')
 
             if n_models == 3:
                 # Create a mid fidelity model
@@ -184,7 +184,7 @@ def get_prior_prior_pf_samples():
                 samples = samples ** 1.1  # add a bias
                 mf_model = Model(
                     eval_fun=lambda x, samples=samples: elliptic_pde.find_xy_pair(x, lf_prior_samples, samples),
-                    n_evals=n_evals[1], n_qoi=n_qoi, rv_name='$q_1$', label='Multi-fidelity (low, mid)')
+                    n_evals=n_evals[1], n_qoi=n_qoi, rv_name='Mid-fidelity: $q_1$', label='Multi-fidelity (low, mid)')
                 models = [lf_model, mf_model, hf_model]
 
             elif n_models == 2:
@@ -219,16 +219,16 @@ def get_prior_prior_pf_samples():
             samples = lf_data[:n_evals[0]]
             lf_prior_samples = prior_samples[:n_evals[0], 0:n_qoi]
             lf_model = Model(eval_fun=lambda x, samples=samples: samples[x], rv_samples=lf_prior_samples,
-                             rv_samples_pred=lf_prior_samples, n_evals=n_evals[0], n_qoi=n_qoi, rv_name='$q_0$',
-                             label='Low-fidelity')
-            data = np.zeros((n_evals[0],1))
+                             rv_samples_pred=lf_prior_samples, n_evals=n_evals[0], n_qoi=n_qoi,
+                             rv_name='Low-fidelity: $q$', label='Low-fidelity')
+            data = np.zeros((n_evals[0], 1))
             data[:, 0] = samples
             lf_model.set_model_evals(data)
 
             # Create a high-fidelity model
             samples = hf_data[:n_evals[-1]]
             hf_model = Model(eval_fun=lambda x, samples=samples: samples[x],n_evals=n_evals[-1], n_qoi=n_qoi,
-                             rv_name='$Q$', label='Multi-fidelity (low, high)')
+                             rv_name='High-fidelity: $Q$', label='Multi-fidelity (low, high)')
 
             data = np.zeros((n_evals[-1], 1))
             data[:, 0] = samples

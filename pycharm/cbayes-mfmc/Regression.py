@@ -74,7 +74,7 @@ class Regression:
             for i in range(n_qoi):
 
                 # Fit a GP regression model to approximate p(q_l|q_l-1)
-                kernel = ConstantKernel() + ConstantKernel() * RBF(np.ones(n_qoi)) + WhiteKernel()
+                kernel = ConstantKernel() + RBF(np.ones(n_qoi)) + WhiteKernel()
                 self.regression_model.append(gaussian_process.GaussianProcessRegressor(kernel=kernel, alpha=1e-6,
                                                                                        n_restarts_optimizer=0))
                 self.regression_model[i].fit(self.x_train, self.y_train[:, i])
@@ -82,7 +82,7 @@ class Regression:
                 # Predict q_l|q_l-1 at all low-fidelity samples
                 self.mu[:, i], self.sigma[:, i] = self.regression_model[i].predict(self.x_pred, return_std=True)
 
-                mu_train, sigma_train = self.regression_model[i].predict(self.x_train, return_std=True)
+                mu_train = self.regression_model[i].predict(self.x_train, return_std=False)
                 noise_train = self.y_train[:, i] - mu_train
                 nmin = np.min(noise_train)
                 nmax = np.max(noise_train)
@@ -91,10 +91,10 @@ class Regression:
                 # samples = np.vstack([np.squeeze(self.x_train), np.squeeze(noise_train)])
                 # df = pd.DataFrame(samples.T, columns=['$Q_1$', 'Noise'])
                 # g = sns.jointplot(x='$Q_1$', y='Noise', data=df, kind='kde', color='C0', shade=True,
-                # shade_lowest=True, cmap='Blues')
+                #                   shade_lowest=True, cmap='Blues')
                 # g.plot_joint(plt.scatter, c='k', alpha=0.3, s=20, linewidth=0.0, marker='o')
                 # g.ax_joint.collections[0].set_alpha(0)
-                # g.ax_joint.legend_.remove()
+                # # g.ax_joint.legend_.remove()
                 # g.set_axis_labels('$Q_1$', 'Noise')
                 # plt.subplots_adjust(top=0.95)
                 # plt.gcf().subplots_adjust(left=0.15)
@@ -110,19 +110,21 @@ class Regression:
                     # given x_pred, generate samples of y and average to get normalizing factor for slice of kde
                     Nsamp = 100
                     nvals = np.random.uniform(low=nmin, high=nmax, size=Nsamp)
-                    kde_slice_samp = joint_kde([self.x_pred[j] * np.ones(Nsamp), nvals])
+                    kde_slice_samp = joint_kde([self.x_pred[j, i] * np.ones(Nsamp), nvals])
                     normfactor = np.mean(kde_slice_samp)
-                    kde_slice_samp *= 1.0/normfactor
-                    ratio = np.divide(kde_slice_samp, 1.0/(nmax-nmin)*np.ones(Nsamp))
+                    kde_slice_samp *= 1.0 / normfactor
+                    ratio = np.divide(kde_slice_samp, 1.0 / (nmax - nmin) * np.ones(Nsamp))
                     ratio *= 1.0 / np.max(ratio)
-                    foundsamp = 0
+                    foundsamp = False
                     ii = 0
-                    while not foundsamp:
+                    while not foundsamp and ii < Nsamp:
                         if ratio[ii] > np.random.uniform(low=0, high=1, size=1):
-                            foundsamp = 1
+                            foundsamp = True
                             hf_model_evals_pred[j, i] += nvals[ii]
                         else:
                             ii += 1
+                    if not foundsamp:
+                        print('Rejection sampling failed. Using the mean prediction without noise.')
 
         elif self.regression_type == 'decoupled_gaussian_process':
 
@@ -394,16 +396,16 @@ class Regression:
                     # given x_pred, generate samples of y and average to get normalizing factor for slice of kde
                     Nsamp = 100
                     nvals = np.random.uniform(low=nmin, high=nmax, size=Nsamp)
-                    kde_slice_samp = joint_kde([self.x_pred[j]*np.ones(Nsamp), nvals])
+                    kde_slice_samp = joint_kde([self.x_pred[j, i] * np.ones(Nsamp), nvals])
                     normfactor = np.mean(kde_slice_samp)
-                    kde_slice_samp *= 1.0/normfactor
-                    ratio = np.divide(kde_slice_samp, 1.0/(nmax-nmin)*np.ones(Nsamp))
-                    ratio *= 1.0/np.max(ratio)
-                    foundsamp = 0
+                    kde_slice_samp *= 1.0 / normfactor
+                    ratio = np.divide(kde_slice_samp, 1.0 / (nmax - nmin) * np.ones(Nsamp))
+                    ratio *= 1.0 / np.max(ratio)
+                    foundsamp = False
                     ii = 0
                     while not foundsamp:
                         if ratio[ii] > np.random.uniform(low=0, high=1, size=1):
-                            foundsamp = 1
+                            foundsamp = True
                             hf_model_evals_pred[j, i] += nvals[ii]
                         else:
                             ii += 1
