@@ -74,7 +74,8 @@ regression_type = 'gaussian_process'
 
 
 def get_prior_prior_pf_samples():
-    prior_samples = prior_pf_samples = obs_loc = obs_scale = prior_pf_mc_samples = mc_model = n_qoi = None
+    prior_samples, prior_pf_samples, obs_loc, obs_scale, prior_pf_mc_samples, mc_model, n_qoi = \
+        None, None, None, None, None, None, None
 
     # Check push forward method
     if fw_uq_method not in ['mc', 'mfmc']:
