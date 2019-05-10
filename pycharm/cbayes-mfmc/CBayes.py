@@ -149,6 +149,8 @@ class CBayesPosterior:
             plt.grid(b=True)
             plt.gcf().savefig('output/cbayes_dists_obs.pdf', dpi=300)
             plt.clf()
+            self.p_post_pf.plot_kde()
+            plt.grid(b=True)
             plt.gcf().savefig('output/cbayes_dists_hf_post_pf.pdf', dpi=300)
 
         plt.clf()
