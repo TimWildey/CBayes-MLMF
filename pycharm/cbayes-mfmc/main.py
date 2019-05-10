@@ -35,7 +35,7 @@ np.random.seed(42)
 #   - elliptic_pde_3d
 #   - linear_elasticity
 
-model = 'linear_elasticity'
+model = 'elliptic_pde_2d'
 
 # Forward UQ method:
 #   - mc
@@ -52,23 +52,25 @@ n_models = len(n_evals)
 
 # Number of samples for the Monte Carlo reference
 
-n_mc_ref = int(5e4)
+n_mc_ref = int(2e4)
 
 # Training set selection strategies:
 #   - support_covering
 #   - sampling
 #   - fixed
 
-training_set_strategy = 'fixed'
+training_set_strategy = 'sampling'
 
 # Regression model types
 #   - gaussian_process
 #   - heteroscedastic_gaussian_process
+#   - consistent_gaussian_process
 #   - decoupled_gaussian_process
+#   - consistent_heteroscedastic_gaussian_process
 #   - decoupled_heteroscedastic_gaussian_process
 #   - gaussian_process_kde
 
-regression_type = 'gaussian_process'
+regression_type = 'heteroscedastic_gaussian_process'
 
 # ------------------------------------------------- Models & Methods -------- #
 
