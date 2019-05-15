@@ -39,7 +39,7 @@ def plot_1d_kde(qkde, xmin=0.0, xmax=1.0, linestyle='-', linewidth=3, color='C0'
         plt.figure(num)
 
     delta = xmax - xmin
-    qplot = np.linspace(xmin - 0.1*delta, xmax + 0.1*delta, num=200)
+    qplot = np.linspace(xmin - 0.1*delta, xmax + 0.1*delta, num=200).squeeze()
     plt.plot(qplot, qkde(qplot), linestyle=linestyle, linewidth=linewidth, color=color, label=label)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)

@@ -111,15 +111,20 @@ def get_prior_prior_pf_samples():
                              rv_name='Low-fidelity: $q_0$', label='Low-fidelity')
 
             # Create a high-fidelity model
+            if n_models == 3:
+                hf_label = 'Multi-fidelity (low, mid, high)'
+            elif n_models == 2:
+                hf_label = 'Multi-fidelity (low, high)'
+            else:
+                hf_label = 'Multi-fidelity'
             hf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 5), n_evals=n_evals[-1],
-                             n_qoi=n_qoi, rv_name='High-fidelity: $Q$', label='Multi-fidelity (low, mid, high)')
+                             n_qoi=n_qoi, rv_name='High-fidelity: $Q$', label=hf_label)
 
             if n_models == 2:
                 models = [lf_model, hf_model]
 
             # Create a mid fidelity model
             elif n_models == 3:
-
                 mf_model = Model(eval_fun=lambda x: lambda_p.lambda_p(x, 3), n_evals=n_evals[1], n_qoi=n_qoi,
                                  rv_name='Mid-fidelity: $q_1$', label='Multi-fidelity (low, mid)')
                 models = [lf_model, mf_model, hf_model]
@@ -176,10 +181,16 @@ def get_prior_prior_pf_samples():
                 n_qoi=n_qoi, rv_name='Low-fidelity: $q_0$', label='Low-fidelity')
 
             # Create a high-fidelity model
+            if n_models == 3:
+                hf_label = 'Multi-fidelity (low, mid, high)'
+            elif n_models == 2:
+                hf_label = 'Multi-fidelity (low, high)'
+            else:
+                hf_label = 'Multi-fidelity'
             samples = prior_pf_samples[-1][:n_evals[0], 0:n_qoi]
             hf_model = Model(
                 eval_fun=lambda x, samples=samples: elliptic_pde.find_xy_pair(x, lf_prior_samples, samples),
-                n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='High-fidelity: $Q$', label='Multi-fidelity (low, mid, high)')
+                n_evals=n_evals[-1], n_qoi=n_qoi, rv_name='High-fidelity: $Q$', label=hf_label)
 
             if n_models == 3:
                 # Create a mid fidelity model
@@ -376,7 +387,13 @@ if __name__ == '__main__':
 
         # Plot high-fidelity and MC posterior densities
         if model is 'lambda_p':
-            cbayes_post.plot_posterior(fignum=5, color='C%d' % (n_models - 1), label='Multi-fidelity (low, mid, high)')
+            if n_models == 3:
+                post_label = 'Multi-fidelity (low, mid, high)'
+            elif n_models == 2:
+                post_label = 'Multi-fidelity (low, high)'
+            else:
+                post_label = 'Multi-fidelity'
+            cbayes_post.plot_posterior(fignum=5, color='C%d' % (n_models - 1), label=post_label)
             cbayes_post_mc.plot_posterior(fignum=5, color='k', linestyle='--', label='MC reference', save_fig=True)
         if model is 'linear_elasticity':
             cbayes_post.plot_posterior(save_fig=True)
@@ -425,6 +442,13 @@ if __name__ == '__main__':
             plt.ylabel('KL')
             plt.xticks([])
             plt.gcf().savefig('output/mfmc_prior_pf_kls.pdf', dpi=300)
+
+    elif fw_uq_method == 'mc':
+        cbayes_post.p_prior.create_kernel_density()
+        xmin = np.min(cbayes_post.p_prior.samples)
+        xmax = np.max(cbayes_post.p_prior.samples)
+        cbayes_post.p_prior.plot_kde(fignum=5, color='C0', linestyle='-', label='Initial', xmin=xmin, xmax=xmax)
+        cbayes_post.plot_posterior(fignum=5, color='C1', linestyle='-', label='Updated', save_fig=True)
 
     # Output directory name
     outdirname = model + '_' + training_set_strategy + '_' + regression_type + '_' + str(n_mc_ref)
